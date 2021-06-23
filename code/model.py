@@ -1,5 +1,6 @@
 import torch.nn.functional as F
 import torch.nn as nn
+import torch
 
 
 # Define  ReidualBlock
@@ -124,3 +125,5 @@ if __name__ == "__main__":
     print()
     print("--- the Structure of the Discriminator model ---")
     print(netD)
+
+    print("IS CUDA AVAILABLE = {}".format(torch.cuda.is_available()))

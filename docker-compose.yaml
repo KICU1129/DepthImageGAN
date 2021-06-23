@@ -1,0 +1,33 @@
+# version: '3'
+# services:
+#   python3:
+#     restart: always
+#     build: .
+#     container_name: 'depthimage_gan'
+#     working_dir: '/root/'
+#     tty: true
+#     volumes:
+#       - ./code:/root/code
+#     extra_hosts:
+#       - "DESKTOP-Q05JTGS:192.168.3.4"
+#     ports:
+#       - 3306:3306
+
+
+version: '3.3'
+services:
+  pytorch:
+    container_name: 'depthimage_gan'
+    image: pytorch/pytorch
+    tty: true
+    runtime: nvidia
+    stdin_open: true
+    ipc: host
+    volumes:
+      - ./code:/root/code
+    working_dir: /code
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
