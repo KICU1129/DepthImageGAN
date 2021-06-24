@@ -51,6 +51,12 @@ GPUの場合3のGPU verをもう一回やればおｋ
 docker image rm "IMAGE ID" -f
 ~~~
 
+**docker 起動**
+~~~
+sudo service docker stop
+sudo service docker start
+~~~
+
 
 
 ## **References**
