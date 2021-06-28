@@ -36,7 +36,7 @@ class ResidualNet(nn.Module):
 
     def forward(self, x):
         for i in range(len(self.blocks)):
-            x = self.block[i](x)
+            x = self.blocks[i](x)
 
         return x
 
@@ -65,16 +65,16 @@ class Generator(nn.Module):
         self.blocks = ResidualNet(n_residual_block, in_features)
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, 3, stride=2, padding=1),
+            nn.ConvTranspose2d(256, 128, 3, stride=2, padding=1,output_padding=1),
             nn.InstanceNorm2d(128),
             nn.ReLU(inplace=True),
 
-            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1),
+            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1,output_padding=1),
             nn.InstanceNorm2d(64),
             nn.ReLU(inplace=True),
 
             nn.ReflectionPad2d(3),
-            nn.Conv2d(64, 3, 7),
+            nn.Conv2d(64, output_nc, 7),
             nn.Tanh()
         )
 
@@ -117,7 +117,7 @@ class Discriminator(nn.Module):
 
 # See Model Structure
 if __name__ == "__main__":
-    netG = Generator(3, 3)
+    netG = Generator(3, 1)
     netD = Discriminator(3)
 
     print("--- the Structure of the Generator model ---")
