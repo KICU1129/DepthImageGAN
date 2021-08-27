@@ -5,6 +5,8 @@ from database import ImageDataset
 
 import numpy as np
 import gc
+import os
+import sys
 
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
@@ -17,9 +19,18 @@ import mlflow
 
 """ --- Initial Setting  ---"""
 opt=Opts()
-recorder=Recoder(opt.version)
 
-mlflow.set_experiment("depthimage-gan{}".format(opt.experience_ver))
+root_path="../output/"
+model_path=root_path+f"model/{opt.experience_ver}/"
+record_path=root_path+f"record/{opt.experience_ver}/"
+if not os.path.exists(model_path):
+    os.mkdir(model_path)
+if not os.path.exists(record_path):
+    os.mkdir(record_path)
+
+recorder=Recoder(opt.version,root=record_path)
+
+mlflow.set_experiment("depthimage-gan_{}".format(opt.experience_ver))
 mlflow.start_run()
 for _ ,(key , item) in enumerate(vars(opt).items()):
     mlflow.log_param(key,item)
@@ -50,10 +61,10 @@ netD_B.apply(weights_init_normal)
 
 # 保存したモデルのロード
 if opt.load_weight is True:
-    netG_A2B.load_state_dict(torch.load("../output/model/netG_A2B.pth", map_location="cuda:0"), strict=False)
-    netG_B2A.load_state_dict(torch.load("../output/model/netG_B2A.pth", map_location="cuda:0"), strict=False)
-    netD_A.load_state_dict(torch.load("../output/model/netD_A.pth", map_location="cuda:0"), strict=False)
-    netD_B.load_state_dict(torch.load("../output/model/netD_B.pth", map_location="cuda:0"), strict=False)
+    netG_A2B.load_state_dict(torch.load(model_path+"netG_A2B.pth", map_location="cuda:0"), strict=False)
+    netG_B2A.load_state_dict(torch.load(model_path+"netG_B2A.pth", map_location="cuda:0"), strict=False)
+    netD_A.load_state_dict(torch.load(model_path+"netD_A.pth", map_location="cuda:0"), strict=False)
+    netD_B.load_state_dict(torch.load(model_path+"netD_B.pth", map_location="cuda:0"), strict=False)
 
 # 損失関数
 criterion_GAN = torch.nn.MSELoss()
@@ -82,12 +93,12 @@ fake_A_buffer = ReplayBuffer()
 fake_B_buffer = ReplayBuffer()
 
 # データローダー
-transforms_ = [ transforms.Resize(int(opt.size*1.12), Image.BICUBIC), 
-                transforms.RandomCrop(opt.size), 
-                transforms.RandomHorizontalFlip(),
+transforms_ = [ transforms.Resize((int(opt.size),int(opt.size)), Image.BICUBIC), 
+                # transforms.RandomCrop(opt.size), 
+                # transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) ]
-dataset=ImageDataset(root=opt.dataroot, transforms_=transforms_, unaligned=False,limit=None)
+dataset=ImageDataset(root=opt.dataroot, transforms_=transforms_, limit=None,unaligned=opt.unaligned)
 dataloader = DataLoader(dataset, 
                         batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
 
@@ -137,42 +148,43 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
         
         optimizer_G.step()
 
-        ##### ドメインAの識別器 #####
-        optimizer_D_A.zero_grad()
+        if i % opt.k == 0:
+            ##### ドメインAの識別器 #####
+            optimizer_D_A.zero_grad()
 
-        # ドメインAの本物画像の識別結果（Real loss）
-        pred_real = netD_A(real_A)
-        loss_D_real = criterion_GAN(pred_real, target_real)
+            # ドメインAの本物画像の識別結果（Real loss）
+            pred_real = netD_A(real_A)
+            loss_D_real = criterion_GAN(pred_real, target_real)
 
-        # ドメインAの生成画像の識別結果（Fake loss）
-        fake_A = fake_A_buffer.push_and_pop(fake_A)
-        pred_fake = netD_A(fake_A.detach())
-        loss_D_fake = criterion_GAN(pred_fake, target_fake)
+            # ドメインAの生成画像の識別結果（Fake loss）
+            fake_A = fake_A_buffer.push_and_pop(fake_A)
+            pred_fake = netD_A(fake_A.detach())
+            loss_D_fake = criterion_GAN(pred_fake, target_fake)
 
-        # 識別器（ドメインA）の合計損失（Total loss）
-        loss_D_A = (loss_D_real + loss_D_fake)*0.5
-        loss_D_A.backward()
+            # 識別器（ドメインA）の合計損失（Total loss）
+            loss_D_A = (loss_D_real + loss_D_fake)*0.5
+            loss_D_A.backward()
 
-        optimizer_D_A.step()
+            optimizer_D_A.step()
 
-        ##### ドメインBの識別器 #####
-        optimizer_D_B.zero_grad()
+            ##### ドメインBの識別器 #####
+            optimizer_D_B.zero_grad()
 
-        # ドメインBの本物画像の識別結果（Real loss）
-        pred_real = netD_B(real_B)
-        loss_D_real = criterion_GAN(pred_real, target_real)
-        
-        # ドメインBの生成画像の識別結果（Fake loss）
-        fake_B = fake_B_buffer.push_and_pop(fake_B)
-        pred_fake = netD_B(fake_B.detach())
-        loss_D_fake = criterion_GAN(pred_fake, target_fake)
+            # ドメインBの本物画像の識別結果（Real loss）
+            pred_real = netD_B(real_B)
+            loss_D_real = criterion_GAN(pred_real, target_real)
+            
+            # ドメインBの生成画像の識別結果（Fake loss）
+            fake_B = fake_B_buffer.push_and_pop(fake_B)
+            pred_fake = netD_B(fake_B.detach())
+            loss_D_fake = criterion_GAN(pred_fake, target_fake)
 
-        # 識別器（ドメインB）の合計損失（Total loss）
-        loss_D_B = (loss_D_real + loss_D_fake)*0.5
-        loss_D_B.backward()
+            # 識別器（ドメインB）の合計損失（Total loss）
+            loss_D_B = (loss_D_real + loss_D_fake)*0.5
+            loss_D_B.backward()
 
-        optimizer_D_B.step()
-        ###################################
+            optimizer_D_B.step()
+            ###################################
 
         if i % 20 == 0:
             print('Epoch[{}]({}/{}) loss_G: {:.4f} loss_G_identity: {:.4f} loss_G_GAN: {:.4f} loss_G_cycle: {:.4f} loss_D: {:.4f}'.format(
@@ -204,10 +216,10 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
     lr_scheduler_D_B.step()
 
     # Save models checkpoints
-    torch.save(netG_A2B.state_dict(), '../output/model/netG_A2B.pth')
-    torch.save(netG_B2A.state_dict(), '../output/model/netG_B2A.pth')
-    torch.save(netD_A.state_dict(), '../output/model/netD_A.pth')
-    torch.save(netD_B.state_dict(), '../output/model/netD_B.pth')
+    torch.save(netG_A2B.state_dict(), model_path+'netG_A2B.pth')
+    torch.save(netG_B2A.state_dict(), model_path+'netG_B2A.pth')
+    torch.save(netD_A.state_dict(), model_path+'netD_A.pth')
+    torch.save(netD_B.state_dict(), model_path+'netD_B.pth')
 
     
 

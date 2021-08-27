@@ -4,6 +4,8 @@ import torchvision.transforms as transforms
 import os
 from PIL import Image
 import random
+import numpy as np
+import  torch
 
 class ImageDataset(Dataset):
     def __init__(self, root, transforms_=None, unaligned=False, mode='train',limit=None):
@@ -14,7 +16,8 @@ class ImageDataset(Dataset):
         
         self.files_A=["{}{}/image/".format(root,f) for f in image_folders]
         self.files_A=["{}{}".format(f,os.listdir(f)[0]) for f in self.files_A]
-        self.files_B=["{}{}/depth/".format(root,f) for f in image_folders]
+        # self.files_B=["{}{}/depth_bfx/".format(root,f) for f in image_folders]
+        self.files_B=["{}{}/depth_color/".format(root,f) for f in image_folders]
         self.files_B=["{}{}".format(f,os.listdir(f)[0]) for f in self.files_B]
 
         if not limit==None:
@@ -28,11 +31,25 @@ class ImageDataset(Dataset):
         item_A = self.transform(Image.open(self.files_A[index % len(self.files_A)]).convert('RGB'))
 
         if self.unaligned:
-            item_B = self.transform(Image.open(self.files_B[random.randint(0, len(self.files_B) - 1)]).convert('RGB'))
+            item_B = self.transform(self._depth_norm(Image.open(self.files_B[random.randint(0, len(self.files_B) - 1)])).convert('RGB'))
         else:
-            item_B = self.transform(Image.open(self.files_B[index % len(self.files_B)]).convert('RGB'))
+            item_B = self.transform(self._depth_norm(Image.open(self.files_B[index % len(self.files_B)])).convert('RGB'))
 
+        # B=self._depth_norm(Image.open(self.files_B[index % len(self.files_B)]))
+        # print(np.array(B))
+        # print(np.shape(B))
         return {'A': item_A, 'B': item_B}
+    
+    def _depth_norm(self,image):
+        return image
+
+        # num_img=np.array(image)
+        # min_p=np.min(num_img)
+        # max_p=np.max(num_img)
+        # # print(f"min={min_p} , max={max_p}")
+        # img=255*(num_img-min_p)/(max_p-min_p)
+
+        # return Image.fromarray(img)
 
     def __len__(self):
         return max(len(self.files_A),len(self.files_B))

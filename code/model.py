@@ -117,13 +117,16 @@ class Discriminator(nn.Module):
 
 # See Model Structure
 if __name__ == "__main__":
-    netG = Generator(3, 1)
+    netG = Generator(3, 3)
     netD = Discriminator(3)
+    ResNet=ResidualBlock(100)
 
     print("--- the Structure of the Generator model ---")
     print(netG)
     print()
     print("--- the Structure of the Discriminator model ---")
     print(netD)
+    print("--- the Structure of the ResNet model ---")
+    print(ResNet)
 
     print("IS CUDA AVAILABLE = {}".format(torch.cuda.is_available()))

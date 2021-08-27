@@ -1,0 +1,4 @@
+artifact_location: file:///mnt/d/CODDING/Project/Research/DepthImageGAN/code/mlruns/5
+experiment_id: '5'
+lifecycle_stage: active
+name: depthimage-gan_cyclegan_paired_ver1.0.0

@@ -1,0 +1,15 @@
+artifact_uri: file:///mnt/d/CODDING/Project/Research/DepthImageGAN/code/segmentation/mlruns/1/20a52644cd4a4cfb9599afd276b763d0/artifacts
+end_time: 1629804152950
+entry_point_name: ''
+experiment_id: '1'
+lifecycle_stage: active
+name: ''
+run_id: 20a52644cd4a4cfb9599afd276b763d0
+run_uuid: 20a52644cd4a4cfb9599afd276b763d0
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1629804152218
+status: 3
+tags: []
+user_id: unknown

@@ -1,0 +1,15 @@
+artifact_uri: file:///mnt/d/CODDING/Project/Research/DepthImageGAN/code/mlruns/6/59bea1b7981a42b0b7e4e8ee92863582/artifacts
+end_time: 1629571643458
+entry_point_name: ''
+experiment_id: '6'
+lifecycle_stage: active
+name: ''
+run_id: 59bea1b7981a42b0b7e4e8ee92863582
+run_uuid: 59bea1b7981a42b0b7e4e8ee92863582
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1629538485879
+status: 3
+tags: []
+user_id: unknown
