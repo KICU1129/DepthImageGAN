@@ -2,7 +2,7 @@ artifact_uri: file:///mnt/d/CODDING/Project/Research/DepthImageGAN/code/segmenta
 end_time: 1629808876737
 entry_point_name: ''
 experiment_id: '1'
-lifecycle_stage: active
+lifecycle_stage: deleted
 name: ''
 run_id: ee1fed2faeab4f3c85c56bfff57c14d8
 run_uuid: ee1fed2faeab4f3c85c56bfff57c14d8

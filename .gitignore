@@ -3,3 +3,9 @@ pytorch/
 
 #dataset directory
 dataset/
+
+#output
+output/
+
+mlflow/
+code/mlflow/

@@ -1,0 +1,15 @@
+artifact_uri: file:///mnt/d/CODDING/Project/Research/DepthImageGAN/code/segmentation/mlruns/1/f7c0de06fd874d8f8035f0f9b784f955/artifacts
+end_time: 1630917624381
+entry_point_name: ''
+experiment_id: '1'
+lifecycle_stage: active
+name: ''
+run_id: f7c0de06fd874d8f8035f0f9b784f955
+run_uuid: f7c0de06fd874d8f8035f0f9b784f955
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1630917591471
+status: 3
+tags: []
+user_id: kisuke
