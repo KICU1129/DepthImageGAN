@@ -13,7 +13,7 @@ class ImageDataset(Dataset):
         self.transform = transforms.Compose(transforms_)
         self.unaligned=unaligned
         image_folders=[f for f in os.listdir(root) if os.path.isdir("{}{}".format(root,f))]
-        
+
         self.files_A=["{}{}/image/".format(root,f) for f in image_folders]
         self.files_A=["{}{}".format(f,os.listdir(f)[0]) for f in self.files_A]
         # self.files_B=["{}{}/depth_bfx/".format(root,f) for f in image_folders]

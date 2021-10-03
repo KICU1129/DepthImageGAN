@@ -1,4 +1,4 @@
-artifact_location: file:///mnt/d/CODDING/Project/Research/DepthImageGAN/code/mlruns/1
+artifact_location: file:///C:/Users/Keisoku/Desktop/KISUKE/Project/DepthImageGAN/code/mlruns/1
 experiment_id: '1'
 lifecycle_stage: active
-name: depthimage-gan_cyclegan_pared_ver0.0.0
+name: depthimage-gan_cyclegan_paired_ver1.0.0

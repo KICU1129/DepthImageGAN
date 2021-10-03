@@ -1,4 +1,0 @@
-artifact_location: file:///mnt/d/CODDING/Project/Research/DepthImageGAN/code/mlruns/4
-experiment_id: '4'
-lifecycle_stage: active
-name: depthimage-gan_cyclegan_unpaired_ver1.0.0

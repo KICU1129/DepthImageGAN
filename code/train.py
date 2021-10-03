@@ -1,4 +1,4 @@
-from model import Generator,Discriminator
+from model import Generator,Discriminator,SNDiscriminator
 from opt import Opts
 from utils import *
 from database import ImageDataset
@@ -11,16 +11,16 @@ import sys
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import torch
-
+ 
 import itertools
 from PIL import Image
-
+import time
 import mlflow
 
 """ --- Initial Setting  ---"""
 opt=Opts()
 
-root_path="../output/"
+root_path="./output/"
 model_path=root_path+f"model/{opt.experience_ver}/"
 record_path=root_path+f"record/{opt.experience_ver}/"
 if not os.path.exists(model_path):
@@ -37,14 +37,18 @@ for _ ,(key , item) in enumerate(vars(opt).items()):
 
 """ --- Call Models ---"""
 
-
 # 生成器
-netG_A2B = Generator(opt.domainA_nc, opt.domainB_nc)
-netG_B2A = Generator(opt.domainB_nc, opt.domainB_nc)
+if opt.G_model=="G":
+    netG_A2B = Generator(opt.domainA_nc, opt.domainB_nc)
+    netG_B2A = Generator(opt.domainB_nc, opt.domainB_nc)
 
 # 識別器
-netD_A = Discriminator(opt.domainA_nc)
-netD_B = Discriminator(opt.domainB_nc)
+if opt.D_model=="D":
+    netD_A = Discriminator(opt.domainA_nc)
+    netD_B = Discriminator(opt.domainB_nc)
+if opt.D_model=="SND":
+    netD_A = SNDiscriminator(opt.domainA_nc)
+    netD_B = SNDiscriminator(opt.domainB_nc)
 
 # GPU
 if not opt.cpu:
@@ -52,7 +56,6 @@ if not opt.cpu:
     netG_B2A.cuda()
     netD_A.cuda()
     netD_B.cuda()
-
 # 重みパラメータ初期化
 netG_A2B.apply(weights_init_normal)
 netG_B2A.apply(weights_init_normal)
@@ -99,7 +102,8 @@ transforms_ = [ transforms.Resize((int(opt.size),int(opt.size)), Image.BICUBIC),
                 transforms.ToTensor(),
                 transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) ]
 dataset=ImageDataset(root=opt.dataroot, transforms_=transforms_, limit=None,unaligned=opt.unaligned)
-dataloader = DataLoader(dataset, 
+
+dataloader = DataLoader(dataset,
                         batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
 
 #Dataset for sampling 
@@ -110,45 +114,48 @@ print("num dataloader= {}".format(len(dataloader)))
 
 """ --- Let's Training !! --- """
 for epoch in range(opt.start_epoch, opt.n_epochs):
+    s=time.time()
     for i, batch in enumerate(dataloader):
         # モデルの入力
         real_A = Variable(input_A.copy_(batch['A']))
         real_B = Variable(input_B.copy_(batch['B']))
 
-        ##### 生成器A2B、B2Aの処理 #####
-        optimizer_G.zero_grad()
+        if i%opt.g_freq==0:
 
-        # 同一性損失の計算（Identity loss)
-        # G_A2B(B)はBと一致
-        same_B = netG_A2B(real_B)
-        loss_identity_B = criterion_identity(same_B, real_B)*5.0
-        # G_B2A(A)はAと一致
-        same_A = netG_B2A(real_A)
-        loss_identity_A = criterion_identity(same_A, real_A)*5.0
+            ##### 生成器A2B、B2Aの処理 #####
+            optimizer_G.zero_grad()
 
-        # 敵対的損失（GAN loss）
-        fake_B = netG_A2B(real_A)
-        pred_fake = netD_B(fake_B)
-        loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
+            # 同一性損失の計算（Identity loss)
+            # G_A2B(B)はBと一致
+            same_B = netG_A2B(real_B)
+            loss_identity_B = criterion_identity(same_B, real_B)*5.0
+            # G_B2A(A)はAと一致
+            same_A = netG_B2A(real_A)
+            loss_identity_A = criterion_identity(same_A, real_A)*5.0
 
-        fake_A = netG_B2A(real_B)
-        pred_fake = netD_A(fake_A)
-        loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
+            # 敵対的損失（GAN loss）
+            fake_B = netG_A2B(real_A)
+            pred_fake = netD_B(fake_B)
+            loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
 
-        # サイクル一貫性損失（Cycle-consistency loss）
-        recovered_A = netG_B2A(fake_B)
-        loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*10.0
+            fake_A = netG_B2A(real_B)
+            pred_fake = netD_A(fake_A)
+            loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
 
-        recovered_B = netG_A2B(fake_A)
-        loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*10.0
+            # サイクル一貫性損失（Cycle-consistency loss）
+            recovered_A = netG_B2A(fake_B)
+            loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*10.0
 
-        # 生成器の合計損失関数（Total loss）
-        loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
-        loss_G.backward()
-        
-        optimizer_G.step()
+            recovered_B = netG_A2B(fake_A)
+            loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*10.0
 
-        if i % opt.k == 0:
+            # 生成器の合計損失関数（Total loss）
+            loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
+            loss_G.backward()
+            
+            optimizer_G.step()
+
+        if i % opt.d_freq == 0:
             ##### ドメインAの識別器 #####
             optimizer_D_A.zero_grad()
 
@@ -186,25 +193,26 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             optimizer_D_B.step()
             ###################################
 
-        if i % 20 == 0:
+        if i % opt.display_iter == 0:
             print('Epoch[{}]({}/{}) loss_G: {:.4f} loss_G_identity: {:.4f} loss_G_GAN: {:.4f} loss_G_cycle: {:.4f} loss_D: {:.4f}'.format(
                 epoch, i, len(dataloader), loss_G, (loss_identity_A + loss_identity_B),
                 (loss_GAN_A2B + loss_GAN_B2A), (loss_cycle_ABA + loss_cycle_BAB), (loss_D_A + loss_D_B)
                 ))
+        
 
-        train_info = {
-            'epoch': epoch, 
-            'batch_num': i, 
-            'lossG': loss_G.item(),
-            'lossG_identity': (loss_identity_A.item() + loss_identity_B.item()),
-            'lossG_GAN': (loss_GAN_A2B.item() + loss_GAN_B2A.item()),
-            'lossG_cycle': (loss_cycle_ABA.item() + loss_cycle_BAB.item()),
-            'lossD': (loss_D_A.item() + loss_D_B.item()), 
-            }
+            train_info = {
+                'epoch': epoch, 
+                'batch_num': i, 
+                'lossG': loss_G.item(),
+                'lossG_identity': (loss_identity_A.item() + loss_identity_B.item()),
+                'lossG_GAN': (loss_GAN_A2B.item() + loss_GAN_B2A.item()),
+                'lossG_cycle': (loss_cycle_ABA.item() + loss_cycle_BAB.item()),
+                'lossD': (loss_D_A.item() + loss_D_B.item()), 
+                }
 
-        #Save Metrics with Mlflow
-        for _ ,(key , item) in enumerate(train_info.items()):
-            mlflow.log_metric(key,item)
+            #Save Metrics with Mlflow
+            for _ ,(key , item) in enumerate(train_info.items()):
+                mlflow.log_metric(key,item)
 
 
 
@@ -215,12 +223,16 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
     lr_scheduler_D_A.step()
     lr_scheduler_D_B.step()
 
-    # Save models checkpoints
-    torch.save(netG_A2B.state_dict(), model_path+'netG_A2B.pth')
-    torch.save(netG_B2A.state_dict(), model_path+'netG_B2A.pth')
-    torch.save(netD_A.state_dict(), model_path+'netD_A.pth')
-    torch.save(netD_B.state_dict(), model_path+'netD_B.pth')
 
+    if epoch % opt.save_epoch==0:
+        # Save models checkpoints
+        torch.save(netG_A2B.state_dict(), model_path+f'netG_A2B_{epoch}.pth')
+        torch.save(netG_B2A.state_dict(), model_path+f'netG_B2A_{epoch}.pth')
+        torch.save(netD_A.state_dict(), model_path+f'netD_A_{epoch}.pth')
+        torch.save(netD_B.state_dict(), model_path+f'netD_B_{epoch}.pth')
+        image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,input_A,input_B)
+
+    print(f"Epoch {epoch}/{opt.n_epochs}  ETA : {round(time.time()-s)}[sec]"  )
     
 
 #Release Memory

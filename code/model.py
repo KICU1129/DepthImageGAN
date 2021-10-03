@@ -114,19 +114,50 @@ class Discriminator(nn.Module):
         x = self.model(x)
         return F.avg_pool2d(x, x.size()[2:]).view(x.size()[0], -1)
 
+class SpectralNorm(nn.Module):
+    def __init__(self) :
+        super(SpectralNorm,self).__init__()
+    def forward(self,input):
+        return nn.utils.spectral_norm(input)
+
+class SNDiscriminator(nn.Module):
+    def __init__(self, input_nc):
+        super(SNDiscriminator, self).__init__()
+
+        self.model = nn.Sequential(
+            nn.utils.spectral_norm(nn.Conv2d(input_nc, 64, 4, stride=2, padding=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.utils.spectral_norm(nn.Conv2d(64, 128, 4, stride=2, padding=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.utils.spectral_norm(nn.Conv2d(128, 256, 4, stride=2, padding=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.utils.spectral_norm(nn.Conv2d(256, 512, 4, stride=1, padding=1)),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(512, 1, 4, padding=1)
+
+        )
+
+    def forward(self, x):
+        x = self.model(x)
+        return F.avg_pool2d(x, x.size()[2:]).view(x.size()[0], -1)
+
 
 # See Model Structure
 if __name__ == "__main__":
     netG = Generator(3, 3)
     netD = Discriminator(3)
-    ResNet=ResidualBlock(100)
+    netSD=SNDiscriminator(3)
 
     print("--- the Structure of the Generator model ---")
     print(netG)
     print()
     print("--- the Structure of the Discriminator model ---")
     print(netD)
-    print("--- the Structure of the ResNet model ---")
-    print(ResNet)
+    print("--- the Structure of the SND model ---")
+    print(netSD)
 
     print("IS CUDA AVAILABLE = {}".format(torch.cuda.is_available()))
