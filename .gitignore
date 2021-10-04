@@ -1,6 +1,6 @@
 #pytorch directory
 pytorch/
-
+code/__pycache__/
 #dataset directory
 dataset/
 
