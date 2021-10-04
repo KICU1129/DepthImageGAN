@@ -6,11 +6,12 @@ import random
 class Opts():
     def __init__(self,seed=1234):
         self.fix_seed(seed)
-        self.experience_ver="cyclegan_unpaired_ver3.0.0"
+        self.experience_ver="cyclegan_unpaired_ver3.1.0"
         self.version="0.0.0"
-        self.memo="DiscriminatorにSpectorNormを導入、これで改善するか？"
+        self.memo="depthを1チャンネルに変更. CycleLossにλでペナルティをカス"
         self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\b3dodata/"
         # self.dataroot = "../dataset/SUNRGBD/SUNRGBD/kv1/b3dodata/"
+        self.depth_name="depth"
 
         self.start_epoch = 0
         self.n_epochs = 1000
@@ -19,13 +20,17 @@ class Opts():
         self.save_epoch=10
         self.lr = 0.0002
         self.decay_epoch = 200
+        #coefficient of cycle consist loss
+        self.lamda_a= 0.5
+        self.lamda_b= 1
+        self.isIdentify=False
 
         self.D_model="SND" # or ["D","SND"] 
         self.G_model="G" # or ["G"]
 
         self.size = 256
         self.domainA_nc = 3
-        self.domainB_nc = 3
+        self.domainB_nc = 1
 
         self.cpu = False
         self.n_cpu = 0

@@ -28,7 +28,7 @@ if not os.path.exists(model_path):
 if not os.path.exists(record_path):
     os.mkdir(record_path)
 
-recorder=Recoder(opt.version,root=record_path)
+recorder=Recoder(opt.version,root=record_path,epoch=opt.start_epoch)
 
 mlflow.set_experiment("depthimage-gan_{}".format(opt.experience_ver))
 mlflow.start_run()
@@ -40,7 +40,7 @@ for _ ,(key , item) in enumerate(vars(opt).items()):
 # 生成器
 if opt.G_model=="G":
     netG_A2B = Generator(opt.domainA_nc, opt.domainB_nc)
-    netG_B2A = Generator(opt.domainB_nc, opt.domainB_nc)
+    netG_B2A = Generator(opt.domainB_nc, opt.domainA_nc)
 
 # 識別器
 if opt.D_model=="D":
@@ -96,12 +96,18 @@ fake_A_buffer = ReplayBuffer()
 fake_B_buffer = ReplayBuffer()
 
 # データローダー
-transforms_ = [ transforms.Resize((int(opt.size),int(opt.size)), Image.BICUBIC), 
+transforms_ = [ transforms.Lambda(normalize),
+                transforms.Lambda(resize),
+                # transforms.Resize((int(opt.size),int(opt.size)), Image.BICUBIC), 
                 # transforms.RandomCrop(opt.size), 
                 # transforms.RandomHorizontalFlip(),
+                
                 transforms.ToTensor(),
-                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) ]
-dataset=ImageDataset(root=opt.dataroot, transforms_=transforms_, limit=None,unaligned=opt.unaligned)
+                # transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) 
+                ]
+
+dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
+                     transforms_=transforms_, limit=None,unaligned=opt.unaligned)
 
 dataloader = DataLoader(dataset,
                         batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
@@ -120,18 +126,20 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
         real_A = Variable(input_A.copy_(batch['A']))
         real_B = Variable(input_B.copy_(batch['B']))
 
+
         if i%opt.g_freq==0:
 
             ##### 生成器A2B、B2Aの処理 #####
             optimizer_G.zero_grad()
 
-            # 同一性損失の計算（Identity loss)
-            # G_A2B(B)はBと一致
-            same_B = netG_A2B(real_B)
-            loss_identity_B = criterion_identity(same_B, real_B)*5.0
-            # G_B2A(A)はAと一致
-            same_A = netG_B2A(real_A)
-            loss_identity_A = criterion_identity(same_A, real_A)*5.0
+            if opt.isIdentify:
+                # 同一性損失の計算（Identity loss)
+                # G_A2B(B)はBと一致
+                same_B = netG_A2B(real_B)
+                loss_identity_B = criterion_identity(same_B, real_B)*5.0
+                # G_B2A(A)はAと一致
+                same_A = netG_B2A(real_A)
+                loss_identity_A = criterion_identity(same_A, real_A)*5.0
 
             # 敵対的損失（GAN loss）
             fake_B = netG_A2B(real_A)
@@ -150,7 +158,10 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*10.0
 
             # 生成器の合計損失関数（Total loss）
-            loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
+            if opt.isIdentify:
+                loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A +opt.lamda_a* loss_cycle_ABA + opt.lamda_b* loss_cycle_BAB
+            else:
+                loss_G =  loss_GAN_A2B + loss_GAN_B2A +opt.lamda_a* loss_cycle_ABA + opt.lamda_b* loss_cycle_BAB
             loss_G.backward()
             
             optimizer_G.step()
@@ -194,8 +205,12 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             ###################################
 
         if i % opt.display_iter == 0:
-            print('Epoch[{}]({}/{}) loss_G: {:.4f} loss_G_identity: {:.4f} loss_G_GAN: {:.4f} loss_G_cycle: {:.4f} loss_D: {:.4f}'.format(
-                epoch, i, len(dataloader), loss_G, (loss_identity_A + loss_identity_B),
+            # print('Epoch[{}]({}/{}) loss_G: {:.4f} loss_G_identity: {:.4f} loss_G_GAN: {:.4f} loss_G_cycle: {:.4f} loss_D: {:.4f}'.format(
+            #     epoch, i, len(dataloader), loss_G, (loss_identity_A + loss_identity_B),
+            #     (loss_GAN_A2B + loss_GAN_B2A), (loss_cycle_ABA + loss_cycle_BAB), (loss_D_A + loss_D_B)
+            #     ))
+            print('Epoch[{}]({}/{}) loss_G: {:.4f}  loss_G_GAN: {:.4f} loss_G_cycle: {:.4f} loss_D: {:.4f}'.format(
+                epoch, i, len(dataloader), loss_G,
                 (loss_GAN_A2B + loss_GAN_B2A), (loss_cycle_ABA + loss_cycle_BAB), (loss_D_A + loss_D_B)
                 ))
         
@@ -204,7 +219,7 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
                 'epoch': epoch, 
                 'batch_num': i, 
                 'lossG': loss_G.item(),
-                'lossG_identity': (loss_identity_A.item() + loss_identity_B.item()),
+                # 'lossG_identity': (loss_identity_A.item() + loss_identity_B.item()),
                 'lossG_GAN': (loss_GAN_A2B.item() + loss_GAN_B2A.item()),
                 'lossG_cycle': (loss_cycle_ABA.item() + loss_cycle_BAB.item()),
                 'lossD': (loss_D_A.item() + loss_D_B.item()), 

@@ -75,7 +75,8 @@ class Generator(nn.Module):
 
             nn.ReflectionPad2d(3),
             nn.Conv2d(64, output_nc, 7),
-            nn.Tanh()
+            # nn.Tanh()
+            nn.Sigmoid()
         )
 
     def forward(self, x):
