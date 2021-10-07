@@ -121,6 +121,8 @@ print("num dataloader= {}".format(len(dataloader)))
 """ --- Let's Training !! --- """
 for epoch in range(opt.start_epoch, opt.n_epochs):
     s=time.time()
+    #For Test generate images
+    # image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,input_A,input_B)
     for i, batch in enumerate(dataloader):
         # モデルの入力
         real_A = Variable(input_A.copy_(batch['A']))

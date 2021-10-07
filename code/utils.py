@@ -14,8 +14,9 @@ import cv2
 def disnorm(img):
     IMAGENET_MEAN = [0.5, 0.5, 0.5]
     IMAGENET_STD = [0.5, 0.5, 0.5]
-
-    return 0.5*(img + 1.0)
+    print(np.max(img))
+    print(np.min(img))
+    return img*255#0.5*(img + 1.0)
 
 def normalize(data):
     # # data=np.array(data)
@@ -121,27 +122,27 @@ class Recoder:
 
         for i, batch in enumerate(dataloader):
             # Set model input
-            real_A = Variable(input_A.copy_(disnorm( batch['A'])))
-            real_B = Variable(input_B.copy_(disnorm(batch['B'])))
-            A=np.array(to_pil_image(batch["A"]))
-            B=np.array(to_pil_image(batch["B"]))
+            real_A = Variable(input_A.copy_(batch['A']))
+            real_B = Variable(input_B.copy_(batch['B']))
+            A= np.array(to_pil_image(batch["A"]))
+            B= np.array(to_pil_image(batch["B"]))/2
             
 
             img_list["real_A"].append(A)
             img_list["real_B"].append(B)
 
             # Generate output
-            fake_B = 0.5*(netG_A2B(real_A).cpu().data + 1.0)
+            fake_B = netG_A2B(real_A).cpu().data#0.5*(netG_A2B(real_A).cpu().data + 1.0)
             #fake_B=rgb2gray(fake_B,np.shape(fake_B))#cv2.cvtColor(fake_B, cv2.COLOR_GRAY2BGR)
             fake_shape=[int(i) for i in  np.shape(fake_B)]
             fake_B=np.array(to_pil_image(torch.reshape(fake_B,(fake_shape[-3],fake_shape[-2],fake_shape[-1]))))
             
-            img_list["fake_B"].append(fake_B)
+            img_list["fake_B"].append(fake_B/2)
 
             # out_img1 = torch.cat([real_A, fake_B,real_B], dim=2)
 
             if netG_B2A!=None and input_B!=None:
-                fake_A = 0.5*(netG_B2A(real_B).cpu().data + 1.0)
+                fake_A = netG_B2A(real_B).cpu().data 
                 fake_shape=[int(i) for i in  np.shape(fake_A)]
                 fake_A=np.array(to_pil_image(torch.reshape(fake_A,(fake_shape[1],fake_shape[2],fake_shape[3]))))
                 img_list["fake_A"].append(fake_A)

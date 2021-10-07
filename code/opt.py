@@ -7,8 +7,8 @@ class Opts():
     def __init__(self,seed=1234):
         self.fix_seed(seed)
         self.experience_ver="cyclegan_unpaired_ver3.1.0"
-        self.version="0.0.0"
-        self.memo="depthを1チャンネルに変更. CycleLossにλでペナルティをカス"
+        self.version="1.0.0"
+        self.memo="depthを1チャンネルに変更. CycleLossにλでペナルティをカス, PILでGray画像の読み込みがバグってから直した"
         self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\b3dodata/"
         # self.dataroot = "../dataset/SUNRGBD/SUNRGBD/kv1/b3dodata/"
         self.depth_name="depth"
