@@ -1,7 +1,7 @@
 from model import Generator,Discriminator
 from opt import TestOpts
-from utils import *
-from database import ImageDataset
+from .utils.utils import *
+from .utils.database import ImageDataset
 
 import numpy as np
 import gc

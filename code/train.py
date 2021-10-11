@@ -1,5 +1,5 @@
-from model import Generator,Discriminator,SNDiscriminator
-from opt import Opts
+from .model import Generator,Discriminator,SNDiscriminator
+from .opts.opt import Opts
 from utils import *
 from database import ImageDataset
 

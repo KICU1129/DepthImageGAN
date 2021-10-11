@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/CODDING/Project/Research/DepthImageGAN/mlruns/3/2393c911c8d74c03bc0a9b337eeda413/artifacts
+end_time: 1633941323952
+entry_point_name: ''
+experiment_id: '3'
+lifecycle_stage: deleted
+name: ''
+run_id: 2393c911c8d74c03bc0a9b337eeda413
+run_uuid: 2393c911c8d74c03bc0a9b337eeda413
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1633941316537
+status: 3
+tags: []
+user_id: kisuke
