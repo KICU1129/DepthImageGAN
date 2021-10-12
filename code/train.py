@@ -88,6 +88,8 @@ lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=La
 Tensor = torch.cuda.FloatTensor if not opt.cpu else torch.Tensor
 input_A = Tensor(opt.batch_size, opt.domainA_nc, opt.size, opt.size)
 input_B = Tensor(opt.batch_size, opt.domainB_nc, opt.size, opt.size)
+test_input_A = Tensor(1, opt.domainA_nc, opt.size, opt.size)
+test_input_B = Tensor(1, opt.domainB_nc, opt.size, opt.size)
 target_real = Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False)
 target_fake = Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False)
 
@@ -108,12 +110,15 @@ transforms_ = [ transforms.Lambda(normalize),
 
 dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
                      transforms_=transforms_, limit=None,unaligned=opt.unaligned)
+test_dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
+                     transforms_=transforms_, limit=100,unaligned=False)
 
 dataloader = DataLoader(dataset,
                         batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
-
+test_dataloader = DataLoader(test_dataset,
+                        batch_size=1, shuffle=False, num_workers=opt.n_cpu)
 #Dataset for sampling 
-sample_images=[dataset[i] for i in range(10) ]
+sample_images=[test_dataset[i] for i in range(10) ]
 
 print("num dataloader= {}".format(len(dataloader)))
 
@@ -122,8 +127,10 @@ print("num dataloader= {}".format(len(dataloader)))
 for epoch in range(opt.start_epoch, opt.n_epochs):
     s=time.time()
     #For Test generate images
-    # image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,input_A,input_B)
+    # image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,test_input_A,test_input_B)
     for i, batch in enumerate(dataloader):
+        if np.shape(batch["A"])[0]<opt.batch_size:
+            break
         # モデルの入力
         real_A = Variable(input_A.copy_(batch['A']))
         real_B = Variable(input_B.copy_(batch['B']))
@@ -247,7 +254,7 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
         torch.save(netG_B2A.state_dict(), model_path+f'netG_B2A_{epoch}.pth')
         torch.save(netD_A.state_dict(), model_path+f'netD_A_{epoch}.pth')
         torch.save(netD_B.state_dict(), model_path+f'netD_B_{epoch}.pth')
-        image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,input_A,input_B)
+        image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,test_input_A,test_input_B)
 
     print(f"Epoch {epoch}/{opt.n_epochs}  ETA : {round(time.time()-s)}[sec]"  )
     
@@ -266,7 +273,7 @@ gc.collect()
 
 
 #Save generate image from netG
-image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,input_A,input_B)
+image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,test_input_A,test_input_B)
 
 mlflow.end_run()
 
