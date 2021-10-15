@@ -1,0 +1,4 @@
+artifact_location: file:///C:/Users/Keisoku/Desktop/KISUKE/Project/DepthGAN_UNet/DepthImageGAN/mlruns/4
+experiment_id: '4'
+lifecycle_stage: active
+name: depthimage-gan_pretrain_gemerator_ver0.0
