@@ -36,7 +36,7 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, index):
 
-        item_A = self.transform(Image.open(self.files_A[index % len(self.files_A)]).convert('RGB'))
+        item_A = self.transform(cv2.imread(self.files_A[index % len(self.files_A)]))
 
         if self.unaligned :
             if self.depth_gray:

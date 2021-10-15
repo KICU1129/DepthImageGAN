@@ -69,7 +69,7 @@ class UpConvBlock(nn.Module):
         self.conv_block = nn.Sequential(
             nn.Conv2d(in_features, out_features, 3,padding=1,stride=1),
             nn.BatchNorm2d(out_features),
-            nn.ReLU(inplace=True)
+            # nn.ReLU(inplace=True)
 
         )
     def forward(self,x):
@@ -101,7 +101,7 @@ class UNetGenerator(nn.Module):
         self.e1=nn.Sequential(
             nn.Conv2d(input_nc, 32, 3,padding=1,stride=1),
             nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True)
+            # nn.ReLU(inplace=True)
 
         )#ConvBlock(input_nc,32)
         self.e2=ConvBlock(32,64,is_cat=True)
@@ -125,7 +125,7 @@ class UNetGenerator(nn.Module):
         self.d5=nn.Sequential(
             nn.Conv2d(32, output_nc, 3,padding=1,stride=1),
             nn.BatchNorm2d(output_nc),
-            nn.ReLU(inplace=True)
+            # nn.ReLU(inplace=True)
 
         )#ConvBlock(32,output_nc)
 
@@ -171,6 +171,32 @@ class UNetDiscriminator(nn.Module):
             nn.BatchNorm2d(256),
             nn.Conv2d(256, 512, 3, stride=2, padding=1),
             nn.BatchNorm2d(512),
+
+            nn.Conv2d(512, 1, 3,stride=1, padding=0),
+            nn.Tanh()
+
+        )
+
+    def forward(self, x):
+        x = self.model(x)
+        return F.avg_pool2d(x, x.size()[2:]).view(x.size()[0], -1)
+
+
+class SNUNetDiscriminator(nn.Module):
+    def __init__(self, input_nc):
+        super(SNUNetDiscriminator, self).__init__()
+
+        self.model = nn.Sequential(
+            nn.Conv2d(input_nc, 32, 3, stride=1, padding=1),
+
+            nn.utils.spectral_norm(nn.Conv2d(32, 64, 3, stride=2, padding=1)),
+            # nn.BatchNorm2d(64),
+            nn.utils.spectral_norm(nn.Conv2d(64, 128, 3, stride=2, padding=1)),
+            # nn.BatchNorm2d(128),
+            nn.utils.spectral_norm(nn.Conv2d(128, 256, 3, stride=2, padding=1)),
+            # nn.BatchNorm2d(256),
+            nn.utils.spectral_norm(nn.Conv2d(256, 512, 3, stride=2, padding=1)),
+            # nn.BatchNorm2d(512),
 
             nn.Conv2d(512, 1, 3,stride=1, padding=0),
             nn.Tanh()

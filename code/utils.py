@@ -14,17 +14,23 @@ import cv2
 def disnorm(img):
     IMAGENET_MEAN = [0.5, 0.5, 0.5]
     IMAGENET_STD = [0.5, 0.5, 0.5]
-    print(np.max(img))
-    print(np.min(img))
-    return img*255#0.5*(img + 1.0)
+    return 0.5*(img + 1.0)
 
-def normalize(data):
+def normalize(data,axis=None):
     # # data=np.array(data)
     # plt.imshow(data,cmap="gray")
     # plt.title("Bugs!!")
     # plt.show()
-    data=(data-np.min(data))/(np.max(data)-np.min(data))
+
+    xmean = np.mean(data,axis=axis, keepdims=True)
+    xstd  = np.std(data, axis=axis, keepdims=True)
+    zscore = (data-xmean)/xstd
     
+    return zscore
+
+def standard(data):
+    data=(data-np.min(data))/(np.max(data)-np.min(data))
+
     return data
 
 def resize(data , size=(256,256)):
@@ -95,13 +101,14 @@ class Recoder:
         for i in range(k):
             ax=fig.add_subplot(4,k,i+1)
             ax.set_title("Real A",fontsize=20)
-            ax.imshow(img_list["real_A"][i])
+            a=ax.imshow(img_list["real_A"][i])
             ax.axis("off")
 
             ax=fig.add_subplot(4,k,i+1+k)
             ax.set_title("Real B",fontsize=20)
-            ax.imshow(img_list["real_B"][i], cmap='gray')
+            a=ax.imshow(img_list["real_B"][i], cmap='jet')
             ax.axis("off")
+            fig.colorbar(a, ax=ax)
 
             ax=fig.add_subplot(4,k,i+1+2*k)
             ax.set_title("Fake A",fontsize=20)
@@ -110,8 +117,9 @@ class Recoder:
 
             ax=fig.add_subplot(4,k,i+1+3*k)
             ax.set_title("Fake B",fontsize=20)
-            ax.imshow(img_list["fake_B"][i], cmap='gray')
+            a=ax.imshow(img_list["fake_B"][i], cmap='jet')
             ax.axis("off")
+            fig.colorbar(a, ax=ax)
 
         plt.savefig(path)
 
@@ -122,17 +130,16 @@ class Recoder:
 
         for i, batch in enumerate(dataloader):
             # Set model input
-            real_A = Variable(input_A.copy_(batch['A']))
+            real_A =  Variable(input_A.copy_(batch['A']))
             real_B = Variable(input_B.copy_(batch['B']))
-            A= np.array(to_pil_image(batch["A"]))
-            B= np.array(to_pil_image(batch["B"]))/2
-            
+            A= np.array(to_pil_image(disnorm(batch["A"])))
+            B= np.array(to_pil_image(disnorm(batch["B"])))
 
             img_list["real_A"].append(A)
             img_list["real_B"].append(B)
 
             # Generate output
-            fake_B = netG_A2B(real_A).cpu().data#0.5*(netG_A2B(real_A).cpu().data + 1.0)
+            fake_B =disnorm( netG_A2B(real_A).cpu().data)#0.5*(netG_A2B(real_A).cpu().data + 1.0)
             #fake_B=rgb2gray(fake_B,np.shape(fake_B))#cv2.cvtColor(fake_B, cv2.COLOR_GRAY2BGR)
             fake_shape=[int(i) for i in  np.shape(fake_B)]
             fake_B=np.array(to_pil_image(torch.reshape(fake_B,(fake_shape[-3],fake_shape[-2],fake_shape[-1]))))
@@ -142,7 +149,7 @@ class Recoder:
             # out_img1 = torch.cat([real_A, fake_B,real_B], dim=2)
 
             if netG_B2A!=None and input_B!=None:
-                fake_A = netG_B2A(real_B).cpu().data 
+                fake_A =disnorm( netG_B2A(real_B).cpu().data) 
                 fake_shape=[int(i) for i in  np.shape(fake_A)]
                 fake_A=np.array(to_pil_image(torch.reshape(fake_A,(fake_shape[1],fake_shape[2],fake_shape[3]))))
                 img_list["fake_A"].append(fake_A)

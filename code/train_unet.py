@@ -1,5 +1,6 @@
 from pickle import FALSE
-from models.model01 import UNetGenerator,UNetDiscriminator,SNDiscriminator
+from models.model01 import UNetGenerator,UNetDiscriminator,SNDiscriminator,SNUNetDiscriminator
+from models.model import Generator,SNDiscriminator
 from opts.opt01 import UNetOpts
 from utils import *
 from database import ImageDataset
@@ -42,11 +43,21 @@ for _ ,(key , item) in enumerate(vars(opt).items()):
 if opt.G_model=="UG":
     netG_A2B = UNetGenerator(opt.domainA_nc, opt.domainB_nc)
     netG_B2A = UNetGenerator(opt.domainB_nc, opt.domainA_nc)
+if opt.G_model=="G":
+    netG_A2B = Generator(opt.domainA_nc, opt.domainB_nc)
+    netG_B2A = Generator(opt.domainB_nc, opt.domainA_nc)
 
 # 識別器
 if opt.D_model=="UD":
     netD_A = UNetDiscriminator(opt.domainA_nc*2)
     netD_B = UNetDiscriminator(opt.domainB_nc*2)
+
+if opt.D_model=="SNUD":
+    netD_A = SNUNetDiscriminator(opt.domainA_nc)
+    netD_B = SNUNetDiscriminator(opt.domainB_nc)
+if opt.D_model=="SND":
+    netD_A = SNDiscriminator(opt.domainA_nc*2)
+    netD_B = SNDiscriminator(opt.domainB_nc*2)
 
 # GPU
 if not opt.cpu:
@@ -96,15 +107,15 @@ fake_A_buffer = ReplayBuffer()
 fake_B_buffer = ReplayBuffer()
 
 # データローダー
-transforms_ = [ transforms.Lambda(normalize),
+transforms_ = [ 
                 transforms.Lambda(lambda x: resize(x,opt.size)),
-                
+                # transforms.Lambda(normalize),
                 transforms.ToTensor(),
-                # transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) 
+                transforms.Normalize((0.5,), (0.5,)) 
                 ]
 
 dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
-                     transforms_=transforms_, limit=100,unaligned=opt.unaligned)
+                     transforms_=transforms_, limit=opt.limit,unaligned=opt.unaligned)
 
 test_dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
                      transforms_=transforms_, limit=100,unaligned=False)
@@ -148,26 +159,27 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             # 敵対的損失（GAN loss）
             fake_B = netG_A2B(real_A)
             # print(np.shape(torch.cat( [real_B,fake_B],dim=1)))
-            pred_fake = netD_B(torch.cat( [real_B,fake_B],dim=1)).squeeze()
-        
-            loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
+            # pred_fake = netD_B(torch.cat( [real_B,fake_B],dim=1)).squeeze()
+            pred_fake = netD_B(fake_B)
+            loss_GAN_A2B = criterion_GAN(pred_fake, target_real.unsqueeze(1))
 
             fake_A = netG_B2A(real_B)
-            pred_fake = netD_A(torch.cat( [real_A,fake_A],dim=1)).squeeze()
-            loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
+            # pred_fake = netD_A(torch.cat( [real_A,fake_A],dim=1)).squeeze()
+            pred_fake = netD_A(fake_A)
+            loss_GAN_B2A = criterion_GAN(pred_fake, target_real.unsqueeze(1))
 
             # サイクル一貫性損失（Cycle-consistency loss）
             recovered_A = netG_B2A(fake_B)
-            loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*10
+            loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*opt.lamda_a
 
             recovered_B = netG_A2B(fake_A)
-            loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*10
+            loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*opt.lamda_b
 
             # 生成器の合計損失関数（Total loss）
             if opt.isIdentify:
-                loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A +opt.lamda_a* loss_cycle_ABA + opt.lamda_b* loss_cycle_BAB
+                loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A +loss_cycle_ABA + loss_cycle_BAB
             else:
-                loss_G =  loss_GAN_A2B + loss_GAN_B2A +opt.lamda_a* loss_cycle_ABA + opt.lamda_b* loss_cycle_BAB
+                loss_G =  loss_GAN_A2B + loss_GAN_B2A +loss_cycle_ABA + loss_cycle_BAB
             loss_G.backward()
             
             optimizer_G.step()
@@ -177,13 +189,15 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             optimizer_D_A.zero_grad()
 
             # ドメインAの本物画像の識別結果（Real loss）
-            pred_real = netD_A(torch.cat( [real_A,real_A],dim=1)).squeeze() #netD_A(real_A)
-            loss_D_real = criterion_GAN(pred_real, target_real)
+            # pred_real = netD_A(torch.cat( [real_A,real_A],dim=1)).squeeze() #netD_A(real_A)
+            pred_real = netD_A(real_A)
+            loss_D_real = criterion_GAN(pred_real, target_real.unsqueeze(1))
 
             # ドメインAの生成画像の識別結果（Fake loss）
             fake_A = fake_A_buffer.push_and_pop(fake_A)
-            pred_fake = netD_A(torch.cat( [real_A,fake_A.detach()],dim=1)).squeeze() #netD_A(fake_A.detach())
-            loss_D_fake = criterion_GAN(pred_fake, target_fake)
+            # pred_fake = netD_A(torch.cat( [real_A,fake_A.detach()],dim=1)).squeeze() #netD_A(fake_A.detach())
+            pred_fake = netD_A(fake_A.detach())
+            loss_D_fake = criterion_GAN(pred_fake, target_fake.unsqueeze(1))
 
             # 識別器（ドメインA）の合計損失（Total loss）
             loss_D_A = (loss_D_real + loss_D_fake)*0.5
@@ -195,13 +209,15 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             optimizer_D_B.zero_grad()
 
             # ドメインBの本物画像の識別結果（Real loss）
-            pred_real = netD_B(torch.cat( [real_B,real_B],dim=1)).squeeze()
-            loss_D_real = criterion_GAN(pred_real, target_real)
+            # pred_real = netD_B(torch.cat( [real_B,real_B],dim=1)).squeeze()
+            pred_real = netD_B(real_B)
+            loss_D_real = criterion_GAN(pred_real, target_real.unsqueeze(1))
             
             # ドメインBの生成画像の識別結果（Fake loss）
             fake_B = fake_B_buffer.push_and_pop(fake_B)
-            pred_fake =netD_B(torch.cat( [real_B,fake_B.detach()],dim=1)).squeeze() #netD_B(fake_B.detach())
-            loss_D_fake = criterion_GAN(pred_fake, target_fake)
+            # pred_fake =netD_B(torch.cat( [real_B,fake_B.detach()],dim=1)).squeeze() #netD_B(fake_B.detach())
+            pred_fake =netD_B(fake_B.detach())
+            loss_D_fake = criterion_GAN(pred_fake, target_fake.unsqueeze(1))
 
             # 識別器（ドメインB）の合計損失（Total loss）
             loss_D_B = (loss_D_real + loss_D_fake)*0.5
