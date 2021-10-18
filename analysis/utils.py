@@ -1,4 +1,3 @@
-from sys import path
 import torch
 from torch.autograd import Variable
 import random
@@ -8,33 +7,6 @@ from torchvision.utils import save_image
 from torchvision.transforms.functional import to_pil_image
 from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
-import cv2
-
-def disnorm(img):
-    IMAGENET_MEAN = [0.5, 0.5, 0.5]
-    IMAGENET_STD = [0.5, 0.5, 0.5]
-
-    return 0.5*(img + 1.0)
-
-def normalize(data):
-    # # data=np.array(data)
-    # plt.imshow(data,cmap="gray")
-    # plt.title("Bugs!!")
-    # plt.show()
-    data=(data-np.min(data))/(np.max(data)-np.min(data))
-    
-    return data
-
-def resize(data , size=(256,256)):
-    data=np.array(data)
-    return cv2.resize(data,size)
-
-def rgb2gray(im,s):
-    im=torch.reshape(im,[1,s[-2],s[-1]])
-    print(f"max : {torch.max(im)} min : {torch.min(im)}")
-    return torch.concat([im, im,im], 0)
-
 
 # 過去の生成データ(50iter分)を保持しておく
 class ReplayBuffer():
@@ -78,80 +50,50 @@ def weights_init_normal(m):
         torch.nn.init.constant(m.bias.data, 0.0)
 
 class Recoder:
-    def __init__(self,version,root="../output/record",epoch=0) :
+    def __init__(self,version,root="../output/record") :
         #self.image_root=os.path.join(root,"images/")#os.path.join(root,"{}-version{}/".format(datetime.date.today(),version))
         self.image_root=os.path.join(root,"{}-version{}/".format(datetime.date.today(),version))
 
-        self.image_num=epoch
+        self.image_num=0
         if not os.path.exists(self.image_root):
             os.mkdir(self.image_root)
-    
-    def _save(self,img_list,path):
-        fig=plt.figure(figsize=(25,20))
-        plt.title("Summary ",fontsize=20)
-        plt.axis("off")
-        k=len(img_list["real_A"])
-        for i in range(k):
-            ax=fig.add_subplot(4,k,i+1)
-            ax.set_title("Real A",fontsize=20)
-            ax.imshow(img_list["real_A"][i])
-            ax.axis("off")
-
-            ax=fig.add_subplot(4,k,i+1+k)
-            ax.set_title("Real B",fontsize=20)
-            ax.imshow(img_list["real_B"][i], cmap='gray')
-            ax.axis("off")
-
-            ax=fig.add_subplot(4,k,i+1+2*k)
-            ax.set_title("Fake A",fontsize=20)
-            ax.imshow(img_list["fake_A"][i])
-            ax.axis("off")
-
-            ax=fig.add_subplot(4,k,i+1+3*k)
-            ax.set_title("Fake B",fontsize=20)
-            ax.imshow(img_list["fake_B"][i], cmap='gray')
-            ax.axis("off")
-
-        plt.savefig(path)
 
     def save_image(self,netG_A2B,netG_B2A,dataloader,input_A,input_B,n_sample=1):
         c=0
         img_path_list={"image-A2B":[],"image-B2A" : []}
-        img_list={"real_A":[],"real_B":[],"fake_A":[],"fake_B":[],}
 
         for i, batch in enumerate(dataloader):
-            # Set model input
-            real_A = Variable(input_A.copy_(disnorm( batch['A'])))
-            real_B = Variable(input_B.copy_(disnorm(batch['B'])))
-            A=np.array(to_pil_image(batch["A"]))
-            B=np.array(to_pil_image(batch["B"]))
-            
+            # image_B=to_pil_image(batch["B"])
+            # image_B.save("./imageB.png")
+            # image_A=to_pil_image(batch["A"])
+            # image_A.save("./imageA.png")
 
-            img_list["real_A"].append(A)
-            img_list["real_B"].append(B)
+
+            # Set model input
+            real_A = Variable(input_A.copy_(batch['A']))
+            real_B = Variable(input_B.copy_(batch['B']))
 
             # Generate output
-            fake_B = 0.5*(netG_A2B(real_A).cpu().data + 1.0)
-            #fake_B=rgb2gray(fake_B,np.shape(fake_B))#cv2.cvtColor(fake_B, cv2.COLOR_GRAY2BGR)
-            fake_shape=[int(i) for i in  np.shape(fake_B)]
-            fake_B=np.array(to_pil_image(torch.reshape(fake_B,(fake_shape[-3],fake_shape[-2],fake_shape[-1]))))
-            
-            img_list["fake_B"].append(fake_B)
+            fake_B = 0.5*(netG_A2B(real_A).data + 1.0)
 
-            # out_img1 = torch.cat([real_A, fake_B,real_B], dim=2)
+            out_img1 = torch.cat([real_A, fake_B,real_B], dim=2)
 
             if netG_B2A!=None and input_B!=None:
-                fake_A = 0.5*(netG_B2A(real_B).cpu().data + 1.0)
-                fake_shape=[int(i) for i in  np.shape(fake_A)]
-                fake_A=np.array(to_pil_image(torch.reshape(fake_A,(fake_shape[1],fake_shape[2],fake_shape[3]))))
-                img_list["fake_A"].append(fake_A)
+                fake_A = 0.5*(netG_B2A(real_B).data + 1.0)
+                out_img2 = torch.cat([real_B, fake_A,real_A], dim=2)
+                imgA2B_path="{}image_A2B_{}-{}.png".format(self.image_root,self.image_num,c)
+                img_path_list["image-A2B"].append(imgA2B_path)
 
-            
+                
+
+            # Save image files
+            imgB2A_path="{}image_B2A_{}-{}.png".format(self.image_root,self.image_num,c)
+            save_image(out_img1,imgA2B_path )
+            save_image(out_img2, imgB2A_path)
+            img_path_list["image-B2A"].append(imgB2A_path)
             c+=1
             if i>n_sample:
                 break
-        im_path=f"{self.image_root}record_epoch_{self.image_num}.png"
-        self._save(img_list,im_path)
         self.image_num+=1
         return img_path_list
         

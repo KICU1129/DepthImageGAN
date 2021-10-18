@@ -36,23 +36,20 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, index):
 
-        item_A = self.transform(Image.open(self.files_A[index % len(self.files_A)]).convert('RGB'))
+        item_A = self.transform(cv2.imread(self.files_A[index % len(self.files_A)]))
 
         if self.unaligned :
             if self.depth_gray:
-                # item_B=Image.open(self.files_B[random.randint(0, len(self.files_B) - 1)]).convert('L')
                 item_B=cv2.imread(self.files_B[random.randint(0, len(self.files_B) - 1)],0)
                 item_B = self.transform(item_B)
             else:
                 item_B = self.transform(self._depth_norm(Image.open(self.files_B[random.randint(0, len(self.files_B) - 1)]).convert('RGB')))
         else:
             if self.depth_gray:
-                # item_B = self.transform(self._depth_norm(Image.open(self.files_B[index % len(self.files_B)]).convert('L')))
-                item_B=self._depth_norm(cv2.imread(self.files_B[index % len(self.files_B)],0))
-                item_B = self.transform(item_B)
+                item_B = self.transform(self._depth_norm(cv2.imread(self.files_B[index % len(self.files_B)],0)))
             else:
                 item_B = self.transform(self._depth_norm(Image.open(self.files_B[index % len(self.files_B)]).convert('RGB')))
-     
+        
         return {'A': item_A, 'B': item_B}
     
     def _depth_norm(self,image):
@@ -71,16 +68,6 @@ class ImageDataset(Dataset):
         
 
 if __name__ =="__main__":
-    transforms_ = [ transforms.Lambda(normalize),
-                transforms.Lambda(resize),
-                # transforms.Resize((int(opt.size),int(opt.size)), Image.BICUBIC), 
-                # transforms.RandomCrop(opt.size), 
-                # transforms.RandomHorizontalFlip(),
-                
-                transforms.ToTensor(),
-                # transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) 
-                ]
-    dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\b3dodata/"
-    dataset=ImageDataset(depth_name="depth",depth_gray=True,root=dataroot,
-                        transforms_=transforms_, limit=None,unaligned=False)
-    dataset[0]
+    path="../dataset/SUNRGBD/SUNRGBD/kv1/b3dodata/"
+    dataset=ImageDataset(path,transforms_=[transforms.ToTensor()])
+    print(dataset[0])

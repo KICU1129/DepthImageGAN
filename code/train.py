@@ -1,4 +1,5 @@
 from model import Generator,Discriminator,SNDiscriminator
+from model_unet import UNetGenerator,SNUNetDiscriminator,UNetDiscriminator
 from opt import Opts
 from utils import *
 from database import ImageDataset
@@ -41,6 +42,9 @@ for _ ,(key , item) in enumerate(vars(opt).items()):
 if opt.G_model=="G":
     netG_A2B = Generator(opt.domainA_nc, opt.domainB_nc)
     netG_B2A = Generator(opt.domainB_nc, opt.domainA_nc)
+if opt.G_model=="UG":
+    netG_A2B = UNetGenerator(opt.domainA_nc, opt.domainB_nc)
+    netG_B2A = UNetGenerator(opt.domainB_nc, opt.domainA_nc)
 
 # 識別器
 if opt.D_model=="D":
@@ -49,6 +53,13 @@ if opt.D_model=="D":
 if opt.D_model=="SND":
     netD_A = SNDiscriminator(opt.domainA_nc)
     netD_B = SNDiscriminator(opt.domainB_nc)
+if opt.D_model=="UD":
+    netD_A = UNetDiscriminator(opt.domainA_nc)
+    netD_B = UNetDiscriminator(opt.domainB_nc)
+
+if opt.D_model=="SNUD":
+    netD_A = SNUNetDiscriminator(opt.domainA_nc)
+    netD_B = SNUNetDiscriminator(opt.domainB_nc)
 
 # GPU
 if not opt.cpu:
@@ -69,6 +80,11 @@ if opt.load_weight is True:
     netD_A.load_state_dict(torch.load(model_path+"netD_A.pth", map_location="cuda:0"), strict=False)
     netD_B.load_state_dict(torch.load(model_path+"netD_B.pth", map_location="cuda:0"), strict=False)
 
+# 保存したモデルのロード
+if opt.is_pretrain is True:
+    netG_A2B.load_state_dict(torch.load(r"C:\Users\Keisoku\Desktop\KISUKE\Project\DepthImageGAN\output\model\pretrain\netG_A2B_1980.pth", map_location="cuda:0"), strict=False)
+    netG_B2A.load_state_dict(torch.load(r"C:\Users\Keisoku\Desktop\KISUKE\Project\DepthImageGAN\output\model\pretrain\netG_B2A_1980.pth", map_location="cuda:0"), strict=False)
+   
 # 損失関数
 criterion_GAN = torch.nn.MSELoss()
 criterion_cycle = torch.nn.L1Loss()
@@ -86,10 +102,10 @@ lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=La
 
 # 入出力メモリ確保
 Tensor = torch.cuda.FloatTensor if not opt.cpu else torch.Tensor
-input_A = Tensor(opt.batch_size, opt.domainA_nc, opt.size, opt.size)
-input_B = Tensor(opt.batch_size, opt.domainB_nc, opt.size, opt.size)
-test_input_A = Tensor(1, opt.domainA_nc, opt.size, opt.size)
-test_input_B = Tensor(1, opt.domainB_nc, opt.size, opt.size)
+input_A = Tensor(opt.batch_size, opt.domainA_nc, opt.size[1], opt.size[0])
+input_B = Tensor(opt.batch_size, opt.domainB_nc, opt.size[1], opt.size[0])
+test_input_A = Tensor(1, opt.domainA_nc, opt.size[1], opt.size[0])
+test_input_B = Tensor(1, opt.domainB_nc, opt.size[1], opt.size[0])
 target_real = Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False)
 target_fake = Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False)
 
@@ -99,7 +115,7 @@ fake_B_buffer = ReplayBuffer()
 
 # データローダー
 transforms_ = [ transforms.Lambda(normalize),
-                transforms.Lambda(resize),
+                transforms.Lambda(lambda x: resize(x,opt.size)),
                 # transforms.Resize((int(opt.size),int(opt.size)), Image.BICUBIC), 
                 # transforms.RandomCrop(opt.size), 
                 # transforms.RandomHorizontalFlip(),
@@ -109,7 +125,7 @@ transforms_ = [ transforms.Lambda(normalize),
                 ]
 
 dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
-                     transforms_=transforms_, limit=None,unaligned=opt.unaligned)
+                     transforms_=transforms_, limit=10,unaligned=opt.unaligned)
 test_dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
                      transforms_=transforms_, limit=100,unaligned=False)
 
@@ -126,8 +142,7 @@ print("num dataloader= {}".format(len(dataloader)))
 """ --- Let's Training !! --- """
 for epoch in range(opt.start_epoch, opt.n_epochs):
     s=time.time()
-    #For Test generate images
-    # image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,test_input_A,test_input_B)
+
     for i, batch in enumerate(dataloader):
         if np.shape(batch["A"])[0]<opt.batch_size:
             break
@@ -161,10 +176,10 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
 
             # サイクル一貫性損失（Cycle-consistency loss）
             recovered_A = netG_B2A(fake_B)
-            loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*10.0
+            loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*opt.lamda_a
 
             recovered_B = netG_A2B(fake_A)
-            loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*10.0
+            loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*opt.lamda_b
 
             # 生成器の合計損失関数（Total loss）
             if opt.isIdentify:

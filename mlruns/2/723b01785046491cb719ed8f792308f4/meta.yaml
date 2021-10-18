@@ -2,7 +2,7 @@ artifact_uri: file:///C:/Users/Keisoku/Desktop/KISUKE/Project/DepthImageGAN/mlru
 end_time: 1633323830962
 entry_point_name: ''
 experiment_id: '2'
-lifecycle_stage: deleted
+lifecycle_stage: active
 name: ''
 run_id: 723b01785046491cb719ed8f792308f4
 run_uuid: 723b01785046491cb719ed8f792308f4
