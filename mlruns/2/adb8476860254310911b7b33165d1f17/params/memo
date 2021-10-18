@@ -1,0 +1,1 @@
+depthを1チャンネルに変更. CycleLossにλでペナルティをカス, BatchSizeを4にして学習
