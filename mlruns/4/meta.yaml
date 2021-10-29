@@ -1,0 +1,4 @@
+artifact_location: file:///C:/Users/Keisoku/Desktop/KISUKE/Project/DepthImageGAN/mlruns/4
+experiment_id: '4'
+lifecycle_stage: active
+name: depthimage-gan_cyclegan_unpaired_ver3.2.0

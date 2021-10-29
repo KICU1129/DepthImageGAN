@@ -22,12 +22,13 @@ class ResidualBlock(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(in_features, in_features, 3,padding=1,stride=1),
             nn.BatchNorm2d(in_features),
-            nn.ReLU(inplace=True),
+            # nn.ReLU(inplace=True),
 
         )
+        self.out=nn.ReLU()
 
     def forward(self, x):
-        return x+self.conv_block(x)
+        return self.out( x+self.conv_block(x))
 
 
 class ResidualNet(nn.Module):
@@ -88,12 +89,17 @@ class UpBlock(nn.Module):
         up=self.Up(x1)
         diffY = x2.size()[2] - x1.size()[2]
         diffX = x2.size()[3] - x1.size()[3]
-
+        # print(x1.size())
+        # print(up.size())
+        # print(x2.size())
         x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
                         diffY // 2, diffY - diffY // 2])
+        
         c1=self.conv1(torch.cat([x2,up],dim=1))
         if self.isLast:
             return c1
+        # print(c1.size())
+        # print()
         return self.conv2(c1)
 
         
@@ -245,7 +251,7 @@ class SNDiscriminator(nn.Module):
     def forward(self, x):
         x = self.model(x)
         
-        return F.avg_pool2d(x, x.size()[2:]).view(x.size()[0], -1)
+        return x#F.avg_pool2d(x, x.size()[2:]).view(x.size()[0], -1)
 
 
 # See Model Structure

@@ -1,0 +1,4 @@
+artifact_location: file:///C:/Users/Keisoku/Desktop/KISUKE/Project/DepthImageGAN/mlruns/6
+experiment_id: '6'
+lifecycle_stage: active
+name: depthimage-gan_cyclegan_Animeface_ver0.0.0

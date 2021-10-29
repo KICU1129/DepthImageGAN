@@ -75,7 +75,7 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
     elif classname.find('BatchNorm2d') != -1:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
-        torch.nn.init.constant(m.bias.data, 0.0)
+        torch.nn.init.constant_(m.bias.data, 0.0)
 
 class Recoder:
     def __init__(self,version,root="../output/record",epoch=0) :
@@ -87,31 +87,42 @@ class Recoder:
             os.mkdir(self.image_root)
     
     def _save(self,img_list,path):
-        fig=plt.figure(figsize=(25,20))
+        fig=plt.figure(figsize=(15,30))
         plt.title("Summary ",fontsize=20)
         plt.axis("off")
         k=len(img_list["real_A"])
         for i in range(k):
-            ax=fig.add_subplot(4,k,i+1)
+            ax=fig.add_subplot(6,k,i+1)
             ax.set_title("Real A",fontsize=20)
-            ax.imshow(img_list["real_A"][i])
+            ax.imshow( img_list["real_A"][i])
             ax.axis("off")
 
-            ax=fig.add_subplot(4,k,i+1+k)
+            ax=fig.add_subplot(6,k,i+1+k)
             ax.set_title("Real B",fontsize=20)
             a=ax.imshow(img_list["real_B"][i], cmap='jet')
             ax.axis("off")
             fig.colorbar(a, ax=ax)
             
 
-            ax=fig.add_subplot(4,k,i+1+2*k)
+            ax=fig.add_subplot(6,k,i+1+2*k)
             ax.set_title("Fake A",fontsize=20)
             ax.imshow(img_list["fake_A"][i])
             ax.axis("off")
 
-            ax=fig.add_subplot(4,k,i+1+3*k)
+            ax=fig.add_subplot(6,k,i+1+3*k)
             ax.set_title("Fake B",fontsize=20)
             a=ax.imshow(img_list["fake_B"][i], cmap='jet')
+            ax.axis("off")
+            fig.colorbar(a, ax=ax)
+
+            ax=fig.add_subplot(6,k,i+1+4*k)
+            ax.set_title("Cycle A",fontsize=20)
+            ax.imshow(img_list["cycle_A"][i])
+            ax.axis("off")
+
+            ax=fig.add_subplot(6,k,i+1+5*k)
+            ax.set_title("Cycle B",fontsize=20)
+            a=ax.imshow(img_list["cycle_B"][i], cmap='jet')
             ax.axis("off")
             fig.colorbar(a, ax=ax)
 
@@ -121,7 +132,7 @@ class Recoder:
     def save_image(self,netG_A2B,netG_B2A,dataloader,input_A,input_B,n_sample=1):
         c=0
         img_path_list={"image-A2B":[],"image-B2A" : []}
-        img_list={"real_A":[],"real_B":[],"fake_A":[],"fake_B":[],}
+        img_list={"real_A":[],"real_B":[],"fake_A":[],"fake_B":[],"cycle_A":[],"cycle_B":[],}
 
         for i, batch in enumerate(dataloader):
             # Set model input
@@ -139,8 +150,12 @@ class Recoder:
             #fake_B=rgb2gray(fake_B,np.shape(fake_B))#cv2.cvtColor(fake_B, cv2.COLOR_GRAY2BGR)
             fake_shape=[int(i) for i in  np.shape(fake_B)]
             fake_B=np.array(to_pil_image(torch.reshape(fake_B,(fake_shape[-3],fake_shape[-2],fake_shape[-1]))))
-            
             img_list["fake_B"].append(fake_B)
+
+            cycle_A = 0.5*(netG_B2A( netG_A2B(real_A)).cpu().data + 1.0)
+            fake_shape=[int(i) for i in  np.shape(cycle_A)]
+            cycle_A=np.array(to_pil_image(torch.reshape(cycle_A,(fake_shape[-3],fake_shape[-2],fake_shape[-1]))))
+            img_list["cycle_A"].append(cycle_A)
 
             # out_img1 = torch.cat([real_A, fake_B,real_B], dim=2)
 
@@ -149,6 +164,11 @@ class Recoder:
                 fake_shape=[int(i) for i in  np.shape(fake_A)]
                 fake_A=np.array(to_pil_image(torch.reshape(fake_A,(fake_shape[1],fake_shape[2],fake_shape[3]))))
                 img_list["fake_A"].append(fake_A)
+
+                cycle_B = 0.5*(netG_A2B(netG_B2A(real_B)).cpu().data + 1.0)
+                fake_shape=[int(i) for i in  np.shape(cycle_B)]
+                cycle_B=np.array(to_pil_image(torch.reshape(cycle_B,(fake_shape[1],fake_shape[2],fake_shape[3]))))
+                img_list["cycle_B"].append(cycle_B)
 
             
             c+=1

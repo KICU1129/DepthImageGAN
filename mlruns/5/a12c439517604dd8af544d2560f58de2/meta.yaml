@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/Keisoku/Desktop/KISUKE/Project/DepthImageGAN/mlruns/5/a12c439517604dd8af544d2560f58de2/artifacts
+end_time: 1635256300260
+entry_point_name: ''
+experiment_id: '5'
+lifecycle_stage: active
+name: ''
+run_id: a12c439517604dd8af544d2560f58de2
+run_uuid: a12c439517604dd8af544d2560f58de2
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1634890010722
+status: 3
+tags: []
+user_id: Keisoku

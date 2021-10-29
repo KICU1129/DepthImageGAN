@@ -1,5 +1,13 @@
 # DepthImageGAN
 
+## Anaconda環境構築
+
+rootで以下のコマンドを実行
+
+~~~
+conda env create -f=env.yml
+~~~
+
 ## **Docker環境 構築**
 
 **1. 取り合えずpytorch をpull**

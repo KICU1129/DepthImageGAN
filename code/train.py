@@ -1,3 +1,6 @@
+from typing import IO
+
+from matplotlib.image import pil_to_array
 from model import Generator,Discriminator,SNDiscriminator
 from model_unet import UNetGenerator,SNUNetDiscriminator,UNetDiscriminator
 from opt import Opts
@@ -17,10 +20,11 @@ import itertools
 from PIL import Image
 import time
 import mlflow
+import matplotlib.pyplot as plt 
 
 """ --- Initial Setting  ---"""
 opt=Opts()
-
+torch.backends.cudnn.benchmark = True
 root_path="./output/"
 model_path=root_path+f"model/{opt.experience_ver}/"
 record_path=root_path+f"record/{opt.experience_ver}/"
@@ -31,10 +35,13 @@ if not os.path.exists(record_path):
 
 recorder=Recoder(opt.version,root=record_path,epoch=opt.start_epoch)
 
-mlflow.set_experiment("depthimage-gan_{}".format(opt.experience_ver))
-mlflow.start_run()
-for _ ,(key , item) in enumerate(vars(opt).items()):
-    mlflow.log_param(key,item)
+if opt.is_mlflow:
+
+    mlflow.set_experiment("depthimage-gan_{}".format(opt.experience_ver))
+    mlflow.start_run()
+    for _ ,(key , item) in enumerate(vars(opt).items()):
+        mlflow.log_param(key,item)
+    print("Mlflow OK!")
 
 """ --- Call Models ---"""
 
@@ -125,7 +132,7 @@ transforms_ = [ transforms.Lambda(normalize),
                 ]
 
 dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
-                     transforms_=transforms_, limit=10,unaligned=opt.unaligned)
+                     transforms_=transforms_, limit=opt.limit,unaligned=opt.unaligned)
 test_dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
                      transforms_=transforms_, limit=100,unaligned=False)
 
@@ -159,20 +166,32 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             if opt.isIdentify:
                 # 同一性損失の計算（Identity loss)
                 # G_A2B(B)はBと一致
-                same_B = netG_A2B(real_B)
-                loss_identity_B = criterion_identity(same_B, real_B)*5.0
+                real_B_=real_B
+                if opt.domainA_nc != opt.domainB_nc:
+                    real_B_=torch.cat([real_B,real_B,real_B],dim=1)
+                    
+                same_B = netG_A2B(real_B_)
+                loss_identity_B = criterion_identity(same_B, real_B)*opt.lamda_i
                 # G_B2A(A)はAと一致
-                same_A = netG_B2A(real_A)
-                loss_identity_A = criterion_identity(same_A, real_A)*5.0
-
+                real_A_=real_A
+                if opt.domainA_nc != opt.domainB_nc:
+                    real_A_=real_A[:,0,:,:,]*0.3+real_A[:,1,:,:,]*0.59+real_A[:,2,:,:]*0.11
+                    
+                same_A = netG_B2A(real_A_.unsqueeze(1))
+                loss_identity_A = criterion_identity(same_A, real_A)*opt.lamda_i
+            else :
+                loss_identity_A=None
+                loss_identity_B=None
             # 敵対的損失（GAN loss）
             fake_B = netG_A2B(real_A)
             pred_fake = netD_B(fake_B)
-            loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
+            # loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
+            loss_GAN_A2B = criterion_GAN(pred_fake, torch.ones_like(pred_fake))
 
             fake_A = netG_B2A(real_B)
             pred_fake = netD_A(fake_A)
-            loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
+            # loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
+            loss_GAN_B2A = criterion_GAN(pred_fake, torch.ones_like(pred_fake))
 
             # サイクル一貫性損失（Cycle-consistency loss）
             recovered_A = netG_B2A(fake_B)
@@ -183,9 +202,9 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
 
             # 生成器の合計損失関数（Total loss）
             if opt.isIdentify:
-                loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A +opt.lamda_a* loss_cycle_ABA + opt.lamda_b* loss_cycle_BAB
+                loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A +loss_cycle_ABA +loss_cycle_BAB
             else:
-                loss_G =  loss_GAN_A2B + loss_GAN_B2A +opt.lamda_a* loss_cycle_ABA + opt.lamda_b* loss_cycle_BAB
+                loss_G =  loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
             loss_G.backward()
             
             optimizer_G.step()
@@ -196,12 +215,14 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
 
             # ドメインAの本物画像の識別結果（Real loss）
             pred_real = netD_A(real_A)
-            loss_D_real = criterion_GAN(pred_real, target_real)
+            # loss_D_real = criterion_GAN(pred_real, target_real)
+            loss_D_real = criterion_GAN(pred_real, torch.ones_like(pred_real))
 
             # ドメインAの生成画像の識別結果（Fake loss）
             fake_A = fake_A_buffer.push_and_pop(fake_A)
             pred_fake = netD_A(fake_A.detach())
-            loss_D_fake = criterion_GAN(pred_fake, target_fake)
+            # loss_D_fake = criterion_GAN(pred_fake, target_fake)
+            loss_D_fake = criterion_GAN(pred_fake, torch.zeros_like(pred_fake))
 
             # 識別器（ドメインA）の合計損失（Total loss）
             loss_D_A = (loss_D_real + loss_D_fake)*0.5
@@ -214,12 +235,14 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
 
             # ドメインBの本物画像の識別結果（Real loss）
             pred_real = netD_B(real_B)
-            loss_D_real = criterion_GAN(pred_real, target_real)
+            # loss_D_real = criterion_GAN(pred_real, target_real)
+            loss_D_real = criterion_GAN(pred_real, torch.ones_like(pred_real))
             
             # ドメインBの生成画像の識別結果（Fake loss）
             fake_B = fake_B_buffer.push_and_pop(fake_B)
             pred_fake = netD_B(fake_B.detach())
-            loss_D_fake = criterion_GAN(pred_fake, target_fake)
+            # loss_D_fake = criterion_GAN(pred_fake, target_fake)
+            loss_D_fake = criterion_GAN(pred_fake, torch.zeros_like(pred_fake))
 
             # 識別器（ドメインB）の合計損失（Total loss）
             loss_D_B = (loss_D_real + loss_D_fake)*0.5
@@ -229,29 +252,32 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             ###################################
 
         if i % opt.display_iter == 0:
-            # print('Epoch[{}]({}/{}) loss_G: {:.4f} loss_G_identity: {:.4f} loss_G_GAN: {:.4f} loss_G_cycle: {:.4f} loss_D: {:.4f}'.format(
-            #     epoch, i, len(dataloader), loss_G, (loss_identity_A + loss_identity_B),
-            #     (loss_GAN_A2B + loss_GAN_B2A), (loss_cycle_ABA + loss_cycle_BAB), (loss_D_A + loss_D_B)
-            #     ))
-            print('Epoch[{}]({}/{}) loss_G: {:.4f}  loss_G_GAN: {:.4f} loss_G_cycle: {:.4f} loss_D: {:.4f}'.format(
-                epoch, i, len(dataloader), loss_G,
+            print('Epoch[{}]({}/{}) loss_G: {:.4f} loss_G_identity: {:.4f} loss_G_GAN: {:.4f} loss_G_cycle: {:.4f} loss_D: {:.4f}'.format(
+                epoch, i, len(dataloader), loss_G, ( loss_identity_A + loss_identity_B) if opt.isIdentify else -1,
                 (loss_GAN_A2B + loss_GAN_B2A), (loss_cycle_ABA + loss_cycle_BAB), (loss_D_A + loss_D_B)
                 ))
+            # print('Epoch[{}]({}/{}) loss_G: {:.4f}  loss_G_GAN: {:.4f} loss_G_cycle: {:.4f} loss_D: {:.4f}'.format(
+            #     epoch, i, len(dataloader), loss_G,
+            #     (loss_GAN_A2B + loss_GAN_B2A), (loss_cycle_ABA + loss_cycle_BAB), (loss_D_A + loss_D_B)
+            #     ))
         
 
             train_info = {
                 'epoch': epoch, 
                 'batch_num': i, 
                 'lossG': loss_G.item(),
-                # 'lossG_identity': (loss_identity_A.item() + loss_identity_B.item()),
-                'lossG_GAN': (loss_GAN_A2B.item() + loss_GAN_B2A.item()),
+                'lossG_identity':  (loss_identity_A.item() + loss_identity_B.item())if opt.isIdentify else -1,
+                'lossG_GAN': (loss_GAN_A2B.item() + loss_GAN_B2A.item()) ,
                 'lossG_cycle': (loss_cycle_ABA.item() + loss_cycle_BAB.item()),
+                'lossG_cycle_A2B':loss_cycle_ABA.item() ,
+                'lossG_cycle_B2A':  loss_cycle_BAB.item(),
                 'lossD': (loss_D_A.item() + loss_D_B.item()), 
                 }
 
             #Save Metrics with Mlflow
-            for _ ,(key , item) in enumerate(train_info.items()):
-                mlflow.log_metric(key,item)
+            if opt.is_mlflow:
+                for _ ,(key , item) in enumerate(train_info.items()):
+                    mlflow.log_metric(key,item)
 
 
 
@@ -279,18 +305,10 @@ del netD_A,netD_B,fake_A_buffer,fake_B_buffer
 gc.collect()
 
 #Save generate image from netG
-# image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,input_A,input_B)
-
-#Save Record with Mlflow
-# for i in range(len(image_pathes['image-A2B'])):
-#     mlflow.log_artifact(image_pathes["image-A2B"][i])
-#     mlflow.log_artifact(image_pathes["image-B2A"][i])
-
-
-#Save generate image from netG
 image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,test_input_A,test_input_B)
 
-mlflow.end_run()
+if opt.is_mlflow:
+    mlflow.end_run()
 
 
 
