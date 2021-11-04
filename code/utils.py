@@ -69,6 +69,22 @@ class LambdaLR():
     def step(self, epoch):
         return 1.0 - max(0, epoch + self.offset - self.decay_start_epoch)/(self.n_epochs - self.decay_start_epoch)
 
+def set_requires_grad(nets, requires_grad=False):
+        """Set requies_grad=Fasle for all the networks to avoid unnecessary computations
+        Parameters:
+            nets (network list)   -- a list of networks
+            requires_grad (bool)  -- whether the networks require gradients or not
+        """
+        if not isinstance(nets, list):
+            nets = [nets]
+        for net in nets:
+            if net is not None:
+                for param in net.parameters():
+                    param.requires_grad = requires_grad
+        
+        return nets
+
+
 def weights_init_normal(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1 and classname.find('ConvBlock') == -1:

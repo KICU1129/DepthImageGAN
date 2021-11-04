@@ -100,12 +100,14 @@ criterion_identity = torch.nn.L1Loss()
 # Optimizers & LR schedulers
 optimizer_G = torch.optim.Adam(itertools.chain(netG_A2B.parameters(), netG_B2A.parameters()),
                                 lr=opt.lr, betas=(0.5, 0.999))
-optimizer_D_A = torch.optim.Adam(netD_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
-optimizer_D_B = torch.optim.Adam(netD_B.parameters(), lr=opt.lr, betas=(0.5, 0.999))
+optimizer_D = torch.optim.Adam(netD_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
+# optimizer_D_A = torch.optim.Adam(netD_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
+# optimizer_D_B = torch.optim.Adam(netD_B.parameters(), lr=opt.lr, betas=(0.5, 0.999))
 
 lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
-lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(optimizer_D_A, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
-lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
+lr_scheduler_D = torch.optim.lr_scheduler.LambdaLR(optimizer_D, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
+# lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(optimizer_D_A, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
+# lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
 
 # 入出力メモリ確保
 Tensor = torch.cuda.FloatTensor if not opt.cpu else torch.Tensor
@@ -161,6 +163,7 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
         if i%opt.g_freq==0:
 
             ##### 生成器A2B、B2Aの処理 #####
+            netD_A,netD_B= set_requires_grad([netD_A,netD_B],requires_grad=False)
             optimizer_G.zero_grad()
 
             if opt.isIdentify:
@@ -186,19 +189,19 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             fake_B = netG_A2B(real_A)
             pred_fake = netD_B(fake_B)
             # loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
-            loss_GAN_A2B = criterion_GAN(pred_fake, torch.ones_like(pred_fake))
+            loss_GAN_A2B = criterion_GAN(pred_fake, torch.ones_like(pred_fake)) 
 
             fake_A = netG_B2A(real_B)
             pred_fake = netD_A(fake_A)
             # loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
-            loss_GAN_B2A = criterion_GAN(pred_fake, torch.ones_like(pred_fake))
+            loss_GAN_B2A = criterion_GAN(pred_fake, torch.ones_like(pred_fake)) 
 
             # サイクル一貫性損失（Cycle-consistency loss）
             recovered_A = netG_B2A(fake_B)
-            loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*opt.lamda_a
+            loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*opt.lamda_a if (i%opt.cycle_freq)==0 else 0
 
             recovered_B = netG_A2B(fake_A)
-            loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*opt.lamda_b
+            loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*opt.lamda_b if (i%opt.cycle_freq)==0 else 0
 
             # 生成器の合計損失関数（Total loss）
             if opt.isIdentify:
@@ -211,7 +214,8 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
 
         if i % opt.d_freq == 0:
             ##### ドメインAの識別器 #####
-            optimizer_D_A.zero_grad()
+            netD_A,netD_B= set_requires_grad([netD_A,netD_B],requires_grad=True)
+            optimizer_D.zero_grad()
 
             # ドメインAの本物画像の識別結果（Real loss）
             pred_real = netD_A(real_A)
@@ -228,10 +232,8 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             loss_D_A = (loss_D_real + loss_D_fake)*0.5
             loss_D_A.backward()
 
-            optimizer_D_A.step()
-
             ##### ドメインBの識別器 #####
-            optimizer_D_B.zero_grad()
+            # optimizer_D_B.zero_grad()
 
             # ドメインBの本物画像の識別結果（Real loss）
             pred_real = netD_B(real_B)
@@ -248,7 +250,9 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             loss_D_B = (loss_D_real + loss_D_fake)*0.5
             loss_D_B.backward()
 
-            optimizer_D_B.step()
+            # optimizer_D_B.step()
+
+            optimizer_D.step()
             ###################################
 
         if i % opt.display_iter == 0:
@@ -285,8 +289,9 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
 
     # Update learning rates
     lr_scheduler_G.step()
-    lr_scheduler_D_A.step()
-    lr_scheduler_D_B.step()
+    lr_scheduler_D.step()
+    # lr_scheduler_D_A.step()
+    # lr_scheduler_D_B.step()
 
 
     if epoch % opt.save_epoch==0:

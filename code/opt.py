@@ -6,11 +6,11 @@ import random
 class Opts():
     def __init__(self,seed=2021):
         self.fix_seed(seed)
-        self.is_mlflow=False
+        self.is_mlflow=True
         self.experience_ver="cyclegan_unpaired_ver4.1.0"
 
-        self.version="4.1.0"
-        self.memo="Identify Loss  UG使う 報告用 "
+        self.version="4.1.1"
+        self.memo="Identify Loss  UG使う , netGとnetDの学習でrequires_gradを切り替える "
 
         self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\NYUdata/"
         # self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\b3dodata/"
@@ -25,12 +25,12 @@ class Opts():
         self.lr = 0.0002
         self.decay_epoch = 200
         #coefficient of cycle consist loss
-        self.lamda_a= 1*0.1
-        self.lamda_b= 1*0.1
-        self.lamda_i=1*1
+        self.lamda_a= 1*1
+        self.lamda_b= 1*1
+        self.lamda_i=1*0
         self.isIdentify=False
 
-        self.D_model="SNUD" # or ["D","SND",SNUD] 
+        self.D_model="UD" # or ["D","SND",SNUD] 
         self.G_model="UG" # or ["G","UG"]
 
         self.size = (320,240)
@@ -48,6 +48,8 @@ class Opts():
         self.d_freq=1
         #Generatorの学習頻度
         self.g_freq=1
+        #Frequency of Cycle Loss
+        self.cycle_freq=5
 
         #pair or unpair ? if unpair True
         # self.unaligned=False
