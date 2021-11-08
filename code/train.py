@@ -6,6 +6,7 @@ from model_unet import UNetGenerator,SNUNetDiscriminator,UNetDiscriminator
 from opt import Opts
 from utils import *
 from database import ImageDataset
+from networks import *
 
 import numpy as np
 import gc
@@ -52,6 +53,10 @@ if opt.G_model=="G":
 if opt.G_model=="UG":
     netG_A2B = UNetGenerator(opt.domainA_nc, opt.domainB_nc)
     netG_B2A = UNetGenerator(opt.domainB_nc, opt.domainA_nc)
+if opt.G_model=="PG":
+    netG_A2B = define_G(input_nc=opt.domainA_nc,output_nc=opt.domainB_nc,ngf=64,netG='resnet_9blocks')
+    netG_B2A = define_G(input_nc=opt.domainB_nc,output_nc=opt.domainA_nc,ngf=64,netG='resnet_9blocks')
+
 
 # 識別器
 if opt.D_model=="D":
@@ -67,6 +72,9 @@ if opt.D_model=="UD":
 if opt.D_model=="SNUD":
     netD_A = SNUNetDiscriminator(opt.domainA_nc)
     netD_B = SNUNetDiscriminator(opt.domainB_nc)
+if opt.D_model=="PD":
+    netD_A = define_D(input_nc=opt.domainA_nc,ndf=64,netD="basic")
+    netD_B = define_D(input_nc=opt.domainB_nc,ndf=64,netD="basic")
 
 # GPU
 if not opt.cpu:

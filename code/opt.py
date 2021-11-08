@@ -7,10 +7,10 @@ class Opts():
     def __init__(self,seed=2021):
         self.fix_seed(seed)
         self.is_mlflow=True
-        self.experience_ver="cyclegan_unpaired_ver4.1.0"
+        self.experience_ver="cyclegan_unpaired_ver5.0.0"
 
-        self.version="4.1.1"
-        self.memo="Identify Loss  UG使う , netGとnetDの学習でrequires_gradを切り替える "
+        self.version="0.0.0"
+        self.memo="Pytorch公式?のネットワークで試す "
 
         self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\NYUdata/"
         # self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\b3dodata/"
@@ -25,15 +25,15 @@ class Opts():
         self.lr = 0.0002
         self.decay_epoch = 200
         #coefficient of cycle consist loss
-        self.lamda_a= 1*1
-        self.lamda_b= 1*1
+        self.lamda_a= 1*10
+        self.lamda_b= 1*10
         self.lamda_i=1*0
         self.isIdentify=False
 
-        self.D_model="UD" # or ["D","SND",SNUD] 
-        self.G_model="UG" # or ["G","UG"]
+        self.D_model="PD" # or ["D","SND",SNUD] 
+        self.G_model="PG" # or ["G","UG"]
 
-        self.size = (320,240)
+        self.size = (256,256)
         self.domainA_nc = 3
         self.domainB_nc = 1
 
@@ -52,8 +52,8 @@ class Opts():
         self.cycle_freq=5
 
         #pair or unpair ? if unpair True
-        # self.unaligned=False
-        self.unaligned=True
+        self.unaligned=False
+        # self.unaligned=True
 
         self.limit=10
 
