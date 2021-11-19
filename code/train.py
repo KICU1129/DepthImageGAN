@@ -34,6 +34,11 @@ if not os.path.exists(model_path):
 if not os.path.exists(record_path):
     os.mkdir(record_path)
 
+# Scheduler用のやつ
+def lambda_rule(epoch):
+    lr_l = 1.0 - max(0, epoch + opt.start_epoch - opt.init_epochs) / float(opt.n_epochs + 1)
+    return lr_l
+
 recorder=Recoder(opt.version,root=record_path,epoch=opt.start_epoch)
 
 if opt.is_mlflow:
@@ -54,8 +59,14 @@ if opt.G_model=="UG":
     netG_A2B = UNetGenerator(opt.domainA_nc, opt.domainB_nc)
     netG_B2A = UNetGenerator(opt.domainB_nc, opt.domainA_nc)
 if opt.G_model=="PG":
-    netG_A2B = define_G(input_nc=opt.domainA_nc,output_nc=opt.domainB_nc,ngf=64,netG='resnet_9blocks')
-    netG_B2A = define_G(input_nc=opt.domainB_nc,output_nc=opt.domainA_nc,ngf=64,netG='resnet_9blocks')
+    netG_A2B = define_G(
+        input_nc=opt.domainA_nc,output_nc=opt.domainB_nc,ngf=64,netG='resnet_9blocks',
+        norm="instance",use_dropout=False,init_type="normal",init_gain=0.02,gpu_ids=[0]
+        )
+    netG_B2A = define_G(
+        input_nc=opt.domainB_nc,output_nc=opt.domainA_nc,ngf=64,netG='resnet_9blocks',
+        norm="instance",use_dropout=False,init_type="normal",init_gain=0.02,gpu_ids=[0]
+        )
 
 
 # 識別器
@@ -73,8 +84,16 @@ if opt.D_model=="SNUD":
     netD_A = SNUNetDiscriminator(opt.domainA_nc)
     netD_B = SNUNetDiscriminator(opt.domainB_nc)
 if opt.D_model=="PD":
-    netD_A = define_D(input_nc=opt.domainA_nc,ndf=64,netD="basic")
-    netD_B = define_D(input_nc=opt.domainB_nc,ndf=64,netD="basic")
+    netD_A = define_D(
+        input_nc=opt.domainA_nc,ndf=64,netD="basic",n_layers_D=3,
+        norm="instance",init_type="normal",init_gain=0.02,gpu_ids=[0]
+        )
+
+    netD_B = define_D(
+        input_nc=opt.domainB_nc,ndf=64,netD="basic",n_layers_D=3,
+        norm="instance",init_type="normal",init_gain=0.02,gpu_ids=[0]
+        
+        )
 
 # GPU
 if not opt.cpu:
@@ -108,12 +127,12 @@ criterion_identity = torch.nn.L1Loss()
 # Optimizers & LR schedulers
 optimizer_G = torch.optim.Adam(itertools.chain(netG_A2B.parameters(), netG_B2A.parameters()),
                                 lr=opt.lr, betas=(0.5, 0.999))
-optimizer_D = torch.optim.Adam(netD_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
+optimizer_D = torch.optim.Adam(itertools.chain(netD_A.parameters(), netD_B.parameters()), lr=opt.lr, betas=(0.5, 0.999))
 # optimizer_D_A = torch.optim.Adam(netD_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
 # optimizer_D_B = torch.optim.Adam(netD_B.parameters(), lr=opt.lr, betas=(0.5, 0.999))
 
-lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
-lr_scheduler_D = torch.optim.lr_scheduler.LambdaLR(optimizer_D, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
+lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=lambda_rule)
+lr_scheduler_D = torch.optim.lr_scheduler.LambdaLR(optimizer_D, lr_lambda=lambda_rule)
 # lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(optimizer_D_A, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
 # lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(opt.n_epochs, opt.start_epoch, opt.decay_epoch).step)
 
@@ -141,11 +160,15 @@ transforms_ = [ transforms.Lambda(normalize),
                 # transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) 
                 ]
 
+subdataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.subdataroot,
+                     transforms_=transforms_, limit=opt.limit,unaligned=False)
 dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
                      transforms_=transforms_, limit=opt.limit,unaligned=opt.unaligned)
 test_dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
                      transforms_=transforms_, limit=100,unaligned=False)
 
+subdataloader = DataLoader(subdataset,
+                        batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
 dataloader = DataLoader(dataset,
                         batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
 test_dataloader = DataLoader(test_dataset,
@@ -159,13 +182,41 @@ print("num dataloader= {}".format(len(dataloader)))
 """ --- Let's Training !! --- """
 for epoch in range(opt.start_epoch, opt.n_epochs):
     s=time.time()
-
+    # old_lr = optimizer_D.param_groups[0]['lr']
+    # lr_scheduler_G.step()
+    # lr_scheduler_D.step()
+    # lr = optimizer_D.param_groups[0]['lr']
+    # print('learning rate %.7f -> %.7f' % (old_lr, lr))
     for i, batch in enumerate(dataloader):
         if np.shape(batch["A"])[0]<opt.batch_size:
             break
+
+        ###### 半教師有学習 #####
+        if opt.is_semi and i % opt.semi_freq ==0:
+            semi_batch=iter(subdataloader).__next__()
+            A = Variable(input_A.copy_(semi_batch['A']))
+            B = Variable(input_B.copy_(semi_batch['B']))
+            #生成画像
+            myfake_A = netG_B2A(B)
+            myfake_B = netG_A2B(A)
+            #BP
+            optimizer_G.zero_grad()
+            loss_A=criterion_GAN(myfake_A,A)
+            loss_B=criterion_GAN(myfake_B,B)
+            semi_loss=loss_A+loss_B
+            semi_loss.backward()
+            optimizer_G.step()
+
+
         # モデルの入力
         real_A = Variable(input_A.copy_(batch['A']))
         real_B = Variable(input_B.copy_(batch['B']))
+
+        #画像をまとめて生成
+        fake_A = netG_B2A(real_B)
+        fake_B = netG_A2B(real_A)
+        cycle_A = netG_B2A(fake_B)
+        cycle_B = netG_A2B(fake_A)
 
 
         if i%opt.g_freq==0:
@@ -191,31 +242,25 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
                 same_A = netG_B2A(real_A_.unsqueeze(1))
                 loss_identity_A = criterion_identity(same_A, real_A)*opt.lamda_i
             else :
-                loss_identity_A=None
-                loss_identity_B=None
+                loss_identity_A=0
+                loss_identity_B=0
+            
+            
             # 敵対的損失（GAN loss）
-            fake_B = netG_A2B(real_A)
-            pred_fake = netD_B(fake_B)
-            # loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
-            loss_GAN_A2B = criterion_GAN(pred_fake, torch.ones_like(pred_fake)) 
+            #Bについての計算
+            pred_fake_B = netD_B(fake_B)
+            loss_GAN_A2B = criterion_GAN(pred_fake_B, torch.ones_like(pred_fake_B)) 
 
-            fake_A = netG_B2A(real_B)
-            pred_fake = netD_A(fake_A)
-            # loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
-            loss_GAN_B2A = criterion_GAN(pred_fake, torch.ones_like(pred_fake)) 
+            #Aについての計算
+            pred_fake_A = netD_A(fake_A)
+            loss_GAN_B2A = criterion_GAN(pred_fake_A, torch.ones_like(pred_fake_A)) 
 
             # サイクル一貫性損失（Cycle-consistency loss）
-            recovered_A = netG_B2A(fake_B)
-            loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*opt.lamda_a if (i%opt.cycle_freq)==0 else 0
-
-            recovered_B = netG_A2B(fake_A)
-            loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*opt.lamda_b if (i%opt.cycle_freq)==0 else 0
+            loss_cycle_ABA = criterion_cycle(cycle_A, real_A)*opt.lamda_a if (i%opt.cycle_freq)==0 else 0
+            loss_cycle_BAB = criterion_cycle(cycle_B, real_B)*opt.lamda_b if (i%opt.cycle_freq)==0 else 0
 
             # 生成器の合計損失関数（Total loss）
-            if opt.isIdentify:
-                loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A +loss_cycle_ABA +loss_cycle_BAB
-            else:
-                loss_G =  loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
+            loss_G =  loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB + loss_identity_A + loss_identity_B
             loss_G.backward()
             
             optimizer_G.step()
@@ -226,15 +271,15 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             optimizer_D.zero_grad()
 
             # ドメインAの本物画像の識別結果（Real loss）
-            pred_real = netD_A(real_A)
+            pred_real_D_A = netD_A(real_A)
             # loss_D_real = criterion_GAN(pred_real, target_real)
-            loss_D_real = criterion_GAN(pred_real, torch.ones_like(pred_real))
+            loss_D_real = criterion_GAN(pred_real_D_A, torch.ones_like(pred_real_D_A))
 
             # ドメインAの生成画像の識別結果（Fake loss）
-            fake_A = fake_A_buffer.push_and_pop(fake_A)
-            pred_fake = netD_A(fake_A.detach())
+            pop_fake_A = fake_A_buffer.push_and_pop(fake_A)
+            pred_fake_D_A = netD_A(pop_fake_A.detach())
             # loss_D_fake = criterion_GAN(pred_fake, target_fake)
-            loss_D_fake = criterion_GAN(pred_fake, torch.zeros_like(pred_fake))
+            loss_D_fake = criterion_GAN(pred_fake_D_A, torch.zeros_like(pred_fake_D_A))
 
             # 識別器（ドメインA）の合計損失（Total loss）
             loss_D_A = (loss_D_real + loss_D_fake)*0.5
@@ -244,15 +289,13 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
             # optimizer_D_B.zero_grad()
 
             # ドメインBの本物画像の識別結果（Real loss）
-            pred_real = netD_B(real_B)
-            # loss_D_real = criterion_GAN(pred_real, target_real)
-            loss_D_real = criterion_GAN(pred_real, torch.ones_like(pred_real))
+            pred_real_D_B = netD_B(real_B)
+            loss_D_real = criterion_GAN(pred_real_D_B, torch.ones_like(pred_real_D_B))
             
             # ドメインBの生成画像の識別結果（Fake loss）
-            fake_B = fake_B_buffer.push_and_pop(fake_B)
-            pred_fake = netD_B(fake_B.detach())
-            # loss_D_fake = criterion_GAN(pred_fake, target_fake)
-            loss_D_fake = criterion_GAN(pred_fake, torch.zeros_like(pred_fake))
+            pop_fake_B = fake_B_buffer.push_and_pop(fake_B)
+            pred_fake_D_B = netD_B(pop_fake_B.detach())
+            loss_D_fake = criterion_GAN(pred_fake_D_B, torch.zeros_like(pred_fake_D_B))
 
             # 識別器（ドメインB）の合計損失（Total loss）
             loss_D_B = (loss_D_real + loss_D_fake)*0.5
@@ -296,18 +339,18 @@ for epoch in range(opt.start_epoch, opt.n_epochs):
         batches_done = (epoch - 1) * len(dataloader) + i
 
     # Update learning rates
-    lr_scheduler_G.step()
-    lr_scheduler_D.step()
+    # lr_scheduler_G.step()
+    # lr_scheduler_D.step()
     # lr_scheduler_D_A.step()
     # lr_scheduler_D_B.step()
 
 
     if epoch % opt.save_epoch==0:
         # Save models checkpoints
-        torch.save(netG_A2B.state_dict(), model_path+f'netG_A2B_{epoch}.pth')
-        torch.save(netG_B2A.state_dict(), model_path+f'netG_B2A_{epoch}.pth')
-        torch.save(netD_A.state_dict(), model_path+f'netD_A_{epoch}.pth')
-        torch.save(netD_B.state_dict(), model_path+f'netD_B_{epoch}.pth')
+        torch.save(netG_A2B.state_dict(), model_path+f'netG_A2B.pth')
+        torch.save(netG_B2A.state_dict(), model_path+f'netG_B2A.pth')
+        torch.save(netD_A.state_dict(), model_path+f'netD_A.pth')
+        torch.save(netD_B.state_dict(), model_path+f'netD_B.pth')
         image_pathes=recorder.save_image(netG_A2B,netG_B2A,sample_images,test_input_A,test_input_B)
 
     print(f"Epoch {epoch}/{opt.n_epochs}  ETA : {round(time.time()-s)}[sec]"  )

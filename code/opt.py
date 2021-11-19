@@ -6,32 +6,36 @@ import random
 class Opts():
     def __init__(self,seed=2021):
         self.fix_seed(seed)
-        self.is_mlflow=True
-        self.experience_ver="cyclegan_unpaired_ver5.0.0"
+        self.is_mlflow=False
+        self.experience_ver="cyclegan_unpaired_ver5.1.0"
 
         self.version="0.0.0"
-        self.memo="Pytorch公式?のネットワークで試す "
+        self.memo="Pytorh公式のネットワークで試す semi-supervised "
 
-        self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\NYUdata/"
+        # self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\NYUdata/"
         # self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\b3dodata/"
-        # self.dataroot = "../dataset/SUNRGBD/SUNRGBD/kv1/b3dodata/"
+        self.dataroot = "./dataset/SUNRGBD/SUNRGBD/kv1/NYUdata/"
+        self.subdataroot = "./dataset/SUNRGBD/SUNRGBD/kv1/b3dodata/"
         self.depth_name="depth_bfx"
 
         self.start_epoch = 0
-        self.n_epochs = 2000
+        self.n_epochs = 1000
+        self.init_epochs=100
         self.batch_size = 1
         self.display_iter=1000
-        self.save_epoch=10
+        self.save_epoch=20
         self.lr = 0.0002
-        self.decay_epoch = 200
+        self.decay_epoch = 100
+        self.pool_size=10
         #coefficient of cycle consist loss
         self.lamda_a= 1*10
         self.lamda_b= 1*10
         self.lamda_i=1*0
         self.isIdentify=False
+        self.is_semi=True
 
-        self.D_model="PD" # or ["D","SND",SNUD] 
-        self.G_model="PG" # or ["G","UG"]
+        self.D_model="PD" # or ["D","SND",SNUD,PD] 
+        self.G_model="PG" # or ["G","UG",PG]
 
         self.size = (256,256)
         self.domainA_nc = 3
@@ -48,12 +52,14 @@ class Opts():
         self.d_freq=1
         #Generatorの学習頻度
         self.g_freq=1
+         #Semi Supervisedの学習頻度
+        self.semi_freq=3
         #Frequency of Cycle Loss
-        self.cycle_freq=5
+        self.cycle_freq=1
 
-        #pair or unpair ? if unpair True
-        self.unaligned=False
-        # self.unaligned=True
+        #pair or unpair ? if True , dataset is selected in unpair 
+        # self.unaligned=False
+        self.unaligned=True
 
         self.limit=10
 
