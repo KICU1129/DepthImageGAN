@@ -52,7 +52,7 @@ def tensor2im(input_image, imtype=np.uint8):
             image_numpy = np.tile(image_numpy, (3, 1, 1))
             image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 * 255.0 
             image_numpy = cv2.cvtColor(image_numpy,cv2.COLOR_BGR2GRAY)
-            return image_numpy
+            return image_numpy.astype(imtype)
         image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 * 255.0  # post-processing: tranpose and scaling
     else:  # if it is a numpy array, do nothing
         image_numpy = input_image
@@ -118,11 +118,11 @@ def weights_init_normal(m):
         torch.nn.init.constant_(m.bias.data, 0.0)
 
 class Recoder:
-    def __init__(self,version,root="../output/record",epoch=0) :
+    def __init__(self,opt,root="../output/record") :
         #self.image_root=os.path.join(root,"images/")#os.path.join(root,"{}-version{}/".format(datetime.date.today(),version))
-        self.image_root=os.path.join(root,"{}-version{}/".format(datetime.date.today(),version))
+        self.image_root=os.path.join(root,"{}-version{}/".format(datetime.date.today(),opt.version))
 
-        self.image_num=epoch
+        self.image_num=opt.start_epoch
         if not os.path.exists(self.image_root):
             os.mkdir(self.image_root)
     

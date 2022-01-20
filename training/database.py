@@ -9,17 +9,17 @@ import random
 import numpy as np
 import  torch
 import matplotlib.pyplot as plt
-from utils import *
+from .utils import *
 
-def get_transform( params=None, grayscale=None, method=Image.BICUBIC, convert=True):
+def get_transform( opt, params=None, grayscale=None, method=Image.BICUBIC, convert=True):
     transform_list = []
     if grayscale:
         transform_list.append(transforms.Grayscale(1))
     
-    osize = [286,286]
+    osize = [int(opt.size[1]*1.1),int(opt.size[0]*1.1)]
     transform_list.append(transforms.Resize(osize, method))
     
-    transform_list.append(transforms.RandomCrop(256)) #256
+    transform_list.append(transforms.RandomCrop([opt.size[-1-i] for i in range(len(opt.size))])) #256
     
 
     # if not opt.no_flip:
@@ -37,23 +37,20 @@ def get_transform( params=None, grayscale=None, method=Image.BICUBIC, convert=Tr
     return transforms.Compose(transform_list)
 
 class ImageDataset(Dataset):
-    def __init__(self, root, transforms_=None,transforms_1dim=None,
-    depth_name="depth_color",depth_gray=False, unaligned=False, mode='train',limit=None,datamode="none"):
+    def __init__(self,opt,root,  unaligned=False, mode='train',limit=None,datamode="none"):
         super(ImageDataset,self).__init__()
-        self.transform = transforms.Compose(transforms_)
-        self.transform_1dim = transforms.Compose(transforms_1dim)
         self.unaligned=unaligned
-        self.depth_gray=depth_gray
+        self.depth_gray=opt.domainB_nc==1
         image_folders=[f for f in os.listdir(root) if os.path.isdir("{}{}".format(root,f))]
 
         self.files_A=["{}{}/image/".format(root,f) for f in image_folders]
         self.files_A=["{}{}".format(f,os.listdir(f)[0]) for f in self.files_A]
         # self.files_B=["{}{}/depth_bfx/".format(root,f) for f in image_folders]
-        self.files_B=["{}{}/{}/".format(root,f,depth_name) for f in image_folders]
+        self.files_B=["{}{}/{}/".format(root,f,opt.depth_name) for f in image_folders]
         self.files_B=["{}{}".format(f,os.listdir(f)[0]) for f in self.files_B]
 
-        self.transform_A = get_transform(grayscale=False)
-        self.transform_B = get_transform(grayscale=True)
+        self.transform_A = get_transform(opt,grayscale=False)
+        self.transform_B = get_transform(opt,grayscale=True)
 
         if not limit==None and datamode!="test":
             self.files_A=self.files_A[:limit]

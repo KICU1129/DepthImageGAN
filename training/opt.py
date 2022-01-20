@@ -12,10 +12,10 @@ class Opts():
         self.version="0.0.0"
         self.memo="U-Netで試す 簡易 "
 
-        # self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\NYUdata/"
-        # self.subdataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\b3dodata/"
-        self.dataroot = "./dataset/SUNRGBD/SUNRGBD/kv1/NYUdata/"
-        self.subdataroot = "./dataset/SUNRGBD/SUNRGBD/kv1/b3dodata/"
+        self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\NYUdata/"
+        self.subdataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\b3dodata/"
+        # self.dataroot = "./dataset/SUNRGBD/SUNRGBD/kv1/NYUdata/"
+        # self.subdataroot = "./dataset/SUNRGBD/SUNRGBD/kv1/b3dodata/"
         self.depth_name="depth_bfx"
 
         self.start_epoch = 0
@@ -31,13 +31,14 @@ class Opts():
         self.lamda_a= 1*10
         self.lamda_b= 1*10
         self.lamda_i=1*0
+
         self.isIdentify=False
         self.is_semi=False
 
         self.D_model="PD" # or ["D","SND",SNUD,PD] 
         self.G_model="PG" # or ["G","UG",PG]
 
-        self.size = (32,32)
+        self.size = [64,48]
         self.domainA_nc = 3
         self.domainB_nc = 1
 

@@ -39,7 +39,7 @@ def lambda_rule(epoch):
     lr_l = 1.0 - max(0, epoch + opt.start_epoch - opt.init_epochs) / float(opt.n_epochs + 1)
     return lr_l
 
-recorder=Recoder(opt.version,root=record_path,epoch=opt.start_epoch)
+recorder=Recoder(opt,root=record_path)
 
 if opt.is_mlflow:
 
@@ -164,12 +164,9 @@ transforms_ = [ transforms.Lambda(normalize),
                 # transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) 
                 ]
 
-subdataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.subdataroot,
-                     transforms_=transforms_, limit=500,unaligned=False)
-dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
-                     transforms_=transforms_, limit=opt.limit,unaligned=opt.unaligned)
-test_dataset=ImageDataset(depth_name=opt.depth_name,depth_gray=opt.domainB_nc==1,root=opt.dataroot,
-                     transforms_=transforms_, limit=100,datamode="test",unaligned=False)
+subdataset=ImageDataset(opt,root=opt.subdataroot,limit=500,unaligned=False)
+dataset=ImageDataset(opt,root=opt.dataroot,limit=opt.limit,unaligned=opt.unaligned)
+test_dataset=ImageDataset(opt,root=opt.dataroot, limit=100,datamode="test",unaligned=False)
 
 subdataloader = DataLoader(subdataset,
                         batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
