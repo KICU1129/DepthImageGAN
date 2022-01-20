@@ -118,11 +118,11 @@ def weights_init_normal(m):
         torch.nn.init.constant_(m.bias.data, 0.0)
 
 class Recoder:
-    def __init__(self,version,root="../output/record",epoch=0) :
+    def __init__(self,opt,root="../output/record") :
         #self.image_root=os.path.join(root,"images/")#os.path.join(root,"{}-version{}/".format(datetime.date.today(),version))
-        self.image_root=os.path.join(root,"{}-version{}/".format(datetime.date.today(),version))
+        self.image_root=os.path.join(root,"{}-version{}/".format(datetime.date.today(),opt.version))
 
-        self.image_num=epoch
+        self.image_num=opt.start_epoch
         if not os.path.exists(self.image_root):
             os.mkdir(self.image_root)
     
