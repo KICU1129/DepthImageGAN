@@ -2,7 +2,7 @@ artifact_uri: file:///D:/CODDING/Project/Research/DepthImageGAN/mlruns/9/8c2038a
 end_time: 1642661658872
 entry_point_name: ''
 experiment_id: '9'
-lifecycle_stage: active
+lifecycle_stage: deleted
 name: ''
 run_id: 8c2038ac10b6450aabb0b440040246a5
 run_uuid: 8c2038ac10b6450aabb0b440040246a5
