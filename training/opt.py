@@ -7,10 +7,10 @@ class Opts():
     def __init__(self,seed=2021):
         self.fix_seed(seed)
         self.is_mlflow=True
-        self.experience_ver="cyclegan_unpaired_ver5.2.0"
+        self.experience_ver="cyclegan_unpaired_ver8.0.0"
 
         self.version="0.0.0"
-        self.memo="U-Netで試す 簡易 "
+        self.memo="semi-supervised semi_limit=10 効果確認 "
 
         self.dataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\NYUdata/"
         self.subdataroot = r"E:\KISUKE\SUNRGBD\SUNRGBD\kv1\b3dodata/"
@@ -38,7 +38,7 @@ class Opts():
         self.D_model="PD" # or ["D","SND",SNUD,PD] 
         self.G_model="PG" # or ["G","UG",PG]
 
-        self.size = [64,48]
+        self.size = [320,240]
         self.domainA_nc = 3
         self.domainB_nc = 1
 
@@ -62,7 +62,8 @@ class Opts():
         # self.unaligned=False
         self.unaligned=True
 
-        self.limit=100
+        self.limit=1000
+        self.semi_limit=10 #eval effect of semi-supervised by number of datasets [10,50,100,500]
 
 
     def fix_seed(self,seed):

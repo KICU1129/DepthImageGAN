@@ -54,7 +54,7 @@ class SegmentationOpts():
         self.load_weight = False
 
         # self.depth="cycle_paired"
-        self.depth="depth"
+        self.depth="depth_bfx"
 
 
     def fix_seed(self,seed):

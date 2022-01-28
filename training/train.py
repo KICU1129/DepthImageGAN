@@ -164,7 +164,7 @@ transforms_ = [ transforms.Lambda(normalize),
                 # transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) 
                 ]
 
-subdataset=ImageDataset(opt,root=opt.subdataroot,limit=500,unaligned=False)
+subdataset=ImageDataset(opt,root=opt.subdataroot,limit=opt.semi_limit,unaligned=False)
 dataset=ImageDataset(opt,root=opt.dataroot,limit=opt.limit,unaligned=opt.unaligned)
 test_dataset=ImageDataset(opt,root=opt.dataroot, limit=100,datamode="test",unaligned=False)
 
