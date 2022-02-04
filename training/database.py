@@ -9,7 +9,7 @@ import random
 import numpy as np
 import  torch
 import matplotlib.pyplot as plt
-from utils import *
+from .utils import *
 
 def get_transform( opt, params=None, grayscale=None, method=Image.BICUBIC, convert=True):
     transform_list = []

@@ -179,6 +179,8 @@ sample_images=[test_dataset[i] for i in range(10) ]
 
 print("num dataloader= {}".format(len(dataloader)))
 
+if opt.is_semi:
+    print("Train with semi-supervised")
 
 """ --- Let's Training !! --- """
 for epoch in range(opt.start_epoch, opt.n_epochs):
