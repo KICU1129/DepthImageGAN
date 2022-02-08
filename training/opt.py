@@ -28,15 +28,15 @@ class Opts():
         self.decay_epoch = 100
         self.pool_size=10
         #coefficient of cycle consist loss
-        self.lamda_a= 1*10
-        self.lamda_b= 1*10
+        self.lamda_a= 1*0.1
+        self.lamda_b= 1*0.1
         self.lamda_i=1*0
 
         self.isIdentify=False
         self.is_semi=False
 
-        self.D_model="PD" # or ["D","SND",SNUD,PD] 
-        self.G_model="PG" # or ["G","UG",PG]
+        self.D_model="SNUD" # or ["D","SND",SNUD,PD] 
+        self.G_model="UG" # or ["G","UG",PG]
 
         self.size = [64,48]
         self.domainA_nc = 3
