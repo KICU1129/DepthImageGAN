@@ -6,8 +6,8 @@ import random
 class SegmentationOpts():
     def __init__(self,seed=1234):
         self.fix_seed(seed)
-        self.experience_ver="segmentaion_unet_ver0.0.0"
-        self.version="true_depth_0.0.2"
+        self.experience_ver="segmentaion_unet_ver1.0.0"
+        self.version="fake_depth_0.0.0"
 
         # self.dataroot = "../../dataset/SUNRGBD/SUNRGBD/kv1/b3dodata/"
         self.dataroot = r"../../dataset/SUNRGBD/SUNRGBD/kv2/kinect2data_segmentation/tain_images_path.txt"
@@ -53,8 +53,8 @@ class SegmentationOpts():
         self.device =  torch.device(self.DEVICE) 
         self.load_weight = False
 
-        # self.depth="cycle_paired"
-        self.depth="depth"
+        self.depth="cycle_paired"
+        # self.depth="depth"
 
 
     def fix_seed(self,seed):

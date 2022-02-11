@@ -209,12 +209,12 @@ for i in range(opt.n_epochs):
  
     print('\nEpoch: {}'.format(i))
 
-    try:
-        train_logs = train_epoch.run(train_dataloader)
-        val_logs = valid_epoch.run(test_dataloader)
-    except Exception as e:
-        print("Error Occored !!")
-        print(e)
+    # try:
+    train_logs = train_epoch.run(train_dataloader)
+    val_logs = valid_epoch.run(test_dataloader)
+    # except Exception as e:
+    #     print("Error Occored !!")
+    #     print(e)
     
     # print(train_logs)
     print("/n [train log]  iou :{}  [valid log]  iou : {}  ".format(train_logs["iou_score"],val_logs["iou_score"]) )

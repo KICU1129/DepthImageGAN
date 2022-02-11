@@ -1,0 +1,4 @@
+artifact_location: file:///D:/CODDING/Project/Research/DepthImageGAN/training/segmentation/mlruns/2
+experiment_id: '2'
+lifecycle_stage: active
+name: segmentation_unet_segmentaion_unet_ver1.0.0
